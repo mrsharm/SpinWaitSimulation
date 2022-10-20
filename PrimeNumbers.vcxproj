@@ -132,6 +132,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EventImpl.h" />
+    <ClInclude Include="ProcessorInfo.h" />
     <ClInclude Include="Volatile.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

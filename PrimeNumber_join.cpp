@@ -10,21 +10,23 @@
 #include <chrono>
 #include "Volatile.h"
 #include "EventImpl.h"
+#include "ProcessorInfo.h"
 
 typedef unsigned long long ulong;
 //_mm_monitorx((const void*)&g_global_location, 0, 0);
 //_mm_mwaitx(2, 0, waitTime);
 
 const int SPIN_COUNT = 128 * 1000;
+const int PROCESSOR_COUNT = GetProcessorCount();
 
 #define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
 
 #ifdef _DEBUG
-//#define PRINT_PROGRESS(msg, ...) printf("[PROGRESS #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_PROGRESS(msg, ...) printf("[PROGRESS #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_ANSWER(msg, ...) printf("[ANSWER #%d] " msg ".\n", __VA_ARGS__);
-//#define PRINT_SOFT_WAIT(msg, ...) printf("[SOFT WAIT #%d] " msg ".\n", __VA_ARGS__);
-//#define PRINT_HARD_WAIT(msg, ...) printf("[HARD WAIT #%d] " msg ".\n", __VA_ARGS__);
-//#define PRINT_RELEASE(msg, ...) printf("[RELEASE #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_SOFT_WAIT(msg, ...) printf("[SOFT WAIT #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_HARD_WAIT(msg, ...) printf("[HARD WAIT #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_RELEASE(msg, ...) printf("[RELEASE #%d] " msg ".\n", __VA_ARGS__);
 
 
 #ifndef PRINT_PROGRESS
@@ -225,7 +227,7 @@ t_join joinData;
 DWORD WINAPI ThreadWorker(LPVOID lpParam)
 {
     ThreadInput* tInput = (ThreadInput*)lpParam;
-
+    
     // Make sure things are initialized correctly.
     assert(tInput->hardWaitCount == 0);
     assert(tInput->softWaitCount == 0);
@@ -280,15 +282,13 @@ public:
     /// <returns></returns>
     bool PrimeNumbersTest(int numPrimeNumbers, int complexity)
     {
-        const auto processor_count = std::thread::hardware_concurrency();
-
-        std::vector<HANDLE> threads(processor_count);
-        std::vector<DWORD> threadIds(processor_count);
-        std::vector<ThreadInput*> threadInputs(processor_count);
-        joinData.init(processor_count);
+        std::vector<HANDLE> threads(PROCESSOR_COUNT);
+        std::vector<DWORD> threadIds(PROCESSOR_COUNT);
+        std::vector<ThreadInput*> threadInputs(PROCESSOR_COUNT);
+        joinData.init(PROCESSOR_COUNT);
 
         // Create all the threads
-        for (uint i = 0; i < processor_count; i++)
+        for (uint i = 0; i < PROCESSOR_COUNT; i++)
         {
             ThreadInput* tInput = (ThreadInput*)malloc(sizeof(ThreadInput));
             if (tInput != NULL)
@@ -341,22 +341,29 @@ public:
         unsigned __int64 start = __rdtsc();
 
         // Start all the threads
-        for (uint i = 0; i < processor_count; i++)
+        for (uint i = 0; i < PROCESSOR_COUNT; i++)
         {
             ResumeThread(threads[i]);
         }
 
-        WaitForMultipleObjects(processor_count, &threads[0], TRUE, INFINITE);
+        WaitForMultipleObjects(PROCESSOR_COUNT, &threads[0], TRUE, INFINITE);
 
         auto elapsed_ticks = __rdtsc() - start;
         auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - beginTimer).count();
-        for (uint i = 0; i < processor_count; i++)
+
+        int totalHardWaits = 0, totalSoftWaits = 0;
+        ulong totalIterations = 0;
+        for (uint i = 0; i < PROCESSOR_COUNT; i++)
         {
             ThreadInput* outputData = threadInputs[i];
             assert(outputData->hardWaitCount < numPrimeNumbers);
             assert(outputData->softWaitCount < numPrimeNumbers);
+            totalHardWaits += outputData->hardWaitCount;
+            totalSoftWaits += outputData->softWaitCount;
+            totalIterations += outputData->totalIterations;
             PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
         }
+        PRINT_STATS("TOTAL Iterations: %llu, HardWait: %d, SoftWait: %d", totalIterations, totalHardWaits, totalSoftWaits);
 
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
         PRINT_STATS("Time difference = %lld msec", elapsed_time);

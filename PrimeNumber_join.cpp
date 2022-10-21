@@ -74,6 +74,7 @@ struct join_structure
     Volatile<int> join_lock;
 };
 
+EventImpl waitToComplete;
 
 class t_join
 {
@@ -153,13 +154,17 @@ public:
         return totalIterations;
     }
 
-    void restart()
+    void restart(bool isLastIteration)
     {
         join_struct.joined_p = false;
         join_struct.join_lock = join_struct.n_threads;
         int color = join_struct.lock_color.LoadWithoutBarrier();
         join_struct.lock_color = !color;
         join_struct.joined_event[color].Set();
+        if (isLastIteration)
+        {
+            waitToComplete.Set();
+        }
     }
 
     bool joined()
@@ -167,10 +172,6 @@ public:
         return join_struct.joined_p;
     }
 };
-
-class ThreadInput;
-
-typedef void (*ThreadCompleteCallback)(ThreadInput*);
 
 class ThreadInput
 {
@@ -190,64 +191,18 @@ public:
     int hardWaitCount;
     int softWaitCount;
 
-    HANDLE tHandle;
-
-    ThreadCompleteCallback completeCallback;
-
     ThreadInput(int threadId, int numPrimeNumbers) :
         threadId(threadId),
         count(numPrimeNumbers),
         answer(0),
         processed(0),
-        completeCallback(nullptr),
         input(nullptr),
-        tHandle(0),
         totalIterations(0),
         hardWaitCount(0),
         softWaitCount(0) {}
-
-    /// <summary>
-    /// This mechanisms is used as a workaround of the limitation of MultipleWaitObjects() can just wait upto MAXIMUM_WAIT_OBJECTS.
-    /// For threads larger than this value, we would `RegisterWaitForSingleObject()` to queue a callback in OS's threadpool and
-    /// when we reach the callback, we would print the stats and also count how many threads are complete. Once everything is complete
-    /// we would ask user to hit ENTER (getch()) to proceed further.
-    /// Reference: https://ikriv.com/blog/?p=1431
-    /// </summary>
-    /// <param name="callback"></param>
-    /// <returns></returns>
-    bool RegisterExitCallback(ThreadCompleteCallback callback)
-    {
-        if (!callback) return false;
-        if (completeCallback) return false;
-
-        completeCallback = callback;
-        HANDLE pHandle;
-        BOOL result = RegisterWaitForSingleObject(&pHandle, tHandle, OnExited, this, INFINITE, WT_EXECUTEONLYONCE);
-        if (!result)
-        {
-            DWORD error = GetLastError();
-            printf("RegisterWaitForSingleObject() failed with error code %d\n", error);
-            exit(1);
-        }
-    }
-
-private:
-
-    static void CALLBACK OnExited(void* context, BOOLEAN isTimeOut)
-    {
-        ((ThreadInput*)context)->OnExited();
-    }
-
-    void OnExited()
-    {
-        completeCallback(this);
-    }
-
 };
 
 t_join joinData;
-CRITICAL_SECTION coutAccess;
-int nRunningProcesses = 0;
 std::chrono::steady_clock::time_point beginTimer;
 unsigned __int64 start;
 
@@ -278,26 +233,6 @@ ulong FindNextPrimeNumber(ulong input)
         }
     }
     return 0;
-}
-
-void StopTimerAndPrint()
-{
-    unsigned __int64 elapsed_ticks = __rdtsc() - start;
-    auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - beginTimer).count();
-    PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
-    PRINT_STATS("Time difference = %lld msec", elapsed_time);
-}
-
-void OnThreadComplete(ThreadInput* outputData)
-{
-    PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", outputData->threadId, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
-    EnterCriticalSection(&coutAccess);
-    if (--nRunningProcesses == 0)
-    {
-        StopTimerAndPrint();
-        printf("All threads completed. Press ENTER to see the stats.\n");
-    }
-    LeaveCriticalSection(&coutAccess);
 }
 
 /// <summary>
@@ -341,7 +276,7 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         }
         if (joinData.joined())
         {
-            joinData.restart();
+            joinData.restart(tInput->processed == tInput->count);
         }
     }
 
@@ -400,10 +335,9 @@ public:
                 NULL,                           // default security attributes
                 0,                              // use default stack size
                 ThreadWorker,                   // thread function name
-                (LPVOID)tInput,   // argument to thread function
+                (LPVOID)tInput,                 // argument to thread function
                 CREATE_SUSPENDED,
                 &tid);                          // returns the thread identifier
-            tInput->tHandle = threads[i];
 
             threadIds[i] = tid;
             threadInputs[i] = tInput;
@@ -414,16 +348,8 @@ public:
             SetThreadDescription(threads[i], buffer);
         }
 
-        bool workaroundMultiWait = (PROCESSOR_COUNT > MAXIMUM_WAIT_OBJECTS);
-
-        // Workaround for limitation of MAXIMUM_WAIT_OBJECTS 
-        if (workaroundMultiWait)
-        {
-            for (int i = 0; i < PROCESSOR_COUNT; i++)
-            {
-                threadInputs[i]->RegisterExitCallback(OnThreadComplete);
-            }
-        }
+        // Create an event to wait for all threads to complete.
+        waitToComplete.CreateManualEvent(false);
 
         // https://stackoverflow.com/a/27739925
         beginTimer = std::chrono::steady_clock::now();
@@ -435,25 +361,18 @@ public:
             ResumeThread(threads[i]);
         }
 
-        if (workaroundMultiWait)
+        // Wait till last thread would signal that it is done.
+        uint32_t dwJoinWait = waitToComplete.Wait(INFINITE, FALSE);
+
+        if (dwJoinWait != WAIT_OBJECT_0)
         {
-            // Simulate WaitForMultipleObjects() for objects > MAXIMUM_WAIT_OBJECTS.
-            _getch();
+            DWORD error = GetLastError();
+            printf("WaitForMultipleObjects() failed with error code %d and return code %d\n", error, dwJoinWait);
+            exit(1);
         }
-        else
-        {
-            auto returnCode = WaitForMultipleObjects(threads.size(), threads.data(), TRUE, INFINITE);
-            if (returnCode != WAIT_OBJECT_0)
-            {
-                DWORD error = GetLastError();
-                printf("WaitForMultipleObjects() failed with error code %d and return code %d\n", error, returnCode);
-                exit(1);
-            }
-            else
-            {
-                StopTimerAndPrint();
-            }
-        }
+
+        unsigned __int64 elapsed_ticks = __rdtsc() - start;
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - beginTimer).count();
 
         int totalHardWaits = 0, totalSoftWaits = 0;
         ulong totalIterations = 0;
@@ -465,13 +384,12 @@ public:
             totalHardWaits += outputData->hardWaitCount;
             totalSoftWaits += outputData->softWaitCount;
             totalIterations += outputData->totalIterations;
-
-            if (!workaroundMultiWait)
-            {
-                PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
-            }
+            PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
         }
+        PRINT_STATS("-----------------------------------------------------------");
         PRINT_STATS("TOTAL Iterations: %llu, HardWait: %d, SoftWait: %d", totalIterations, totalHardWaits, totalSoftWaits);
+        PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
+        PRINT_STATS("Time difference = %lld msec", elapsed_time);
 
         return true;
     }
@@ -505,10 +423,6 @@ int main(int argc, char** argv)
         PrintUsageAndExit();
     }
 
-    nRunningProcesses = PROCESSOR_COUNT;
-    InitializeCriticalSection(&coutAccess);
-
-    printf(" Using %s WaitForMultipleObjects() logic.", (nRunningProcesses > MAXIMUM_WAIT_OBJECTS) ? "workaround" : "regular");
     PrimeNumbers p;
     p.PrimeNumbersTest(numPrimeNumbers, complexity);
 

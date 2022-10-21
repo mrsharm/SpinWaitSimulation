@@ -17,7 +17,7 @@ typedef unsigned long long ulong;
 //_mm_mwaitx(2, 0, waitTime);
 
 const int SPIN_COUNT = 128 * 1000;
-const int PROCESSOR_COUNT = GetProcessorCount();
+int PROCESSOR_COUNT = GetProcessorCount();
 
 #define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
 
@@ -61,35 +61,6 @@ const int PROCESSOR_COUNT = GetProcessorCount();
 #define PRINT_HARD_WAIT(msg, ...)
 #define PRINT_RELEASE(msg, ...)
 #endif
-
-/// <summary>
-/// Given a number 'input', each thread finds smallest prime number greater than 'n'.
-/// If next prime number is beyond INT_MAX, it will return 0.
-/// </summary>
-/// <param name="n"></param>
-/// <returns></returns>
-ulong FindNextPrimeNumber(ulong input)
-{
-    // Start checking each number from input upto input * 2.
-    for (ulong i = input; i < input * 2; i++)
-    {
-        bool found = true;
-        for (ulong j = 2; j < i / 2; j++)
-        {
-            if (i % j == 0)
-            {
-                found = false;
-                break;
-            }
-        }
-
-        if (found)
-        {
-            return i;
-        }
-    }
-    return 0;
-}
 
 
 struct join_structure
@@ -135,11 +106,11 @@ public:
         ulong totalIterations = 0;
         *wasHardWait = false;
         int color = join_struct.lock_color.LoadWithoutBarrier();
-        if (_InterlockedDecrement((long *) &join_struct.join_lock) != 0)
+        if (_InterlockedDecrement((long*)&join_struct.join_lock) != 0)
         {
             if (color == join_struct.lock_color.LoadWithoutBarrier())
             {
-respin:
+            respin:
                 for (int j = 0; j < SPIN_COUNT; j++)
                 {
                     totalIterations++;
@@ -197,9 +168,13 @@ respin:
     }
 };
 
+class ThreadInput;
 
-struct ThreadInput
+typedef void (*ThreadCompleteCallback)(ThreadInput*);
+
+class ThreadInput
 {
+public:
     // Just to keep track of answers so the compiler doesn't discard them
     // during optimization.
     int answer;
@@ -214,9 +189,116 @@ struct ThreadInput
     ulong totalIterations;
     int hardWaitCount;
     int softWaitCount;
+
+    HANDLE tHandle;
+
+    ThreadCompleteCallback completeCallback;
+
+    ThreadInput(int threadId, int numPrimeNumbers) :
+        threadId(threadId),
+        count(numPrimeNumbers),
+        answer(0),
+        processed(0),
+        completeCallback(nullptr),
+        input(nullptr),
+        tHandle(0),
+        totalIterations(0),
+        hardWaitCount(0),
+        softWaitCount(0) {}
+
+    /// <summary>
+    /// This mechanisms is used as a workaround of the limitation of MultipleWaitObjects() can just wait upto MAXIMUM_WAIT_OBJECTS.
+    /// For threads larger than this value, we would `RegisterWaitForSingleObject()` to queue a callback in OS's threadpool and
+    /// when we reach the callback, we would print the stats and also count how many threads are complete. Once everything is complete
+    /// we would ask user to hit ENTER (getch()) to proceed further.
+    /// Reference: https://ikriv.com/blog/?p=1431
+    /// </summary>
+    /// <param name="callback"></param>
+    /// <returns></returns>
+    bool RegisterExitCallback(ThreadCompleteCallback callback)
+    {
+        if (!callback) return false;
+        if (completeCallback) return false;
+
+        completeCallback = callback;
+        HANDLE pHandle;
+        BOOL result = RegisterWaitForSingleObject(&pHandle, tHandle, OnExited, this, INFINITE, WT_EXECUTEONLYONCE);
+        if (!result)
+        {
+            DWORD error = GetLastError();
+            printf("RegisterWaitForSingleObject() failed with error code %d\n", error);
+            exit(1);
+        }
+    }
+
+private:
+
+    static void CALLBACK OnExited(void* context, BOOLEAN isTimeOut)
+    {
+        ((ThreadInput*)context)->OnExited();
+    }
+
+    void OnExited()
+    {
+        completeCallback(this);
+    }
+
 };
 
 t_join joinData;
+CRITICAL_SECTION coutAccess;
+int nRunningProcesses = 0;
+std::chrono::steady_clock::time_point beginTimer;
+unsigned __int64 start;
+
+/// <summary>
+/// Given a number 'input', each thread finds smallest prime number greater than 'n'.
+/// If next prime number is beyond INT_MAX, it will return 0.
+/// </summary>
+/// <param name="n"></param>
+/// <returns></returns>
+ulong FindNextPrimeNumber(ulong input)
+{
+    // Start checking each number from input upto input * 2.
+    for (ulong i = input; i < input * 2; i++)
+    {
+        bool found = true;
+        for (ulong j = 2; j < i / 2; j++)
+        {
+            if (i % j == 0)
+            {
+                found = false;
+                break;
+            }
+        }
+
+        if (found)
+        {
+            return i;
+        }
+    }
+    return 0;
+}
+
+void StopTimerAndPrint()
+{
+    unsigned __int64 elapsed_ticks = __rdtsc() - start;
+    auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - beginTimer).count();
+    PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
+    PRINT_STATS("Time difference = %lld msec", elapsed_time);
+}
+
+void OnThreadComplete(ThreadInput* outputData)
+{
+    PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", outputData->threadId, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
+    EnterCriticalSection(&coutAccess);
+    if (--nRunningProcesses == 0)
+    {
+        StopTimerAndPrint();
+        printf("All threads completed. Press ENTER to see the stats.\n");
+    }
+    LeaveCriticalSection(&coutAccess);
+}
 
 /// <summary>
 /// Threads will fetch a number from the queue and start the work to find the prime number.
@@ -227,7 +309,7 @@ t_join joinData;
 DWORD WINAPI ThreadWorker(LPVOID lpParam)
 {
     ThreadInput* tInput = (ThreadInput*)lpParam;
-    
+
     // Make sure things are initialized correctly.
     assert(tInput->hardWaitCount == 0);
     assert(tInput->softWaitCount == 0);
@@ -237,13 +319,13 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
 
     for (int i = 0; i < tInput->count; i++)
     {
+        PRINT_PROGRESS("*** Processing: %u out of %u..", threadId, tInput->processed, tInput->count);
         ulong input = tInput->input[i];
         ulong answer = FindNextPrimeNumber(input);
-        processedCount++;
+        tInput->processed++;
 
         // So the compiler doesn't throw away answer and processedCount;
         tInput->answer |= answer;
-        tInput->processed |= processedCount;
 
         PRINT_ANSWER(" %u %llu= %llu", threadId, processedCount, input, answer);
 
@@ -269,8 +351,9 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
 
 class PrimeNumbers
 {
-public:
+private:
 
+public:
     /// <summary>
     /// Given a number 'n', each thread finds smallest prime number greater than 'n'.
     /// If next prime number is beyond INT_MAX, it will return 0.
@@ -288,9 +371,9 @@ public:
         joinData.init(PROCESSOR_COUNT);
 
         // Create all the threads
-        for (uint i = 0; i < PROCESSOR_COUNT; i++)
+        for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
-            ThreadInput* tInput = (ThreadInput*)malloc(sizeof(ThreadInput));
+            ThreadInput* tInput = new ThreadInput(i, numPrimeNumbers);
             if (tInput != NULL)
             {
                 float n;
@@ -307,13 +390,6 @@ public:
                         tInput->input[i] = (ulong)(n * (100 + pow(2, complexity)));
                     }
                 }
-                tInput->count = numPrimeNumbers;
-                tInput->threadId = i;
-                tInput->answer = 0;
-                tInput->processed = 0;
-                tInput->totalIterations = 0;
-                tInput->hardWaitCount = 0;
-                tInput->softWaitCount = 0;
             }
             else {
                 assert(!"Failed to allocate tInput");
@@ -327,6 +403,8 @@ public:
                 (LPVOID)tInput,   // argument to thread function
                 CREATE_SUSPENDED,
                 &tid);                          // returns the thread identifier
+            tInput->tHandle = threads[i];
+
             threadIds[i] = tid;
             threadInputs[i] = tInput;
 
@@ -336,56 +414,101 @@ public:
             SetThreadDescription(threads[i], buffer);
         }
 
+        bool workaroundMultiWait = (PROCESSOR_COUNT > MAXIMUM_WAIT_OBJECTS);
+
+        // Workaround for limitation of MAXIMUM_WAIT_OBJECTS 
+        if (workaroundMultiWait)
+        {
+            for (int i = 0; i < PROCESSOR_COUNT; i++)
+            {
+                threadInputs[i]->RegisterExitCallback(OnThreadComplete);
+            }
+        }
+
         // https://stackoverflow.com/a/27739925
-        std::chrono::steady_clock::time_point beginTimer = std::chrono::steady_clock::now();
-        unsigned __int64 start = __rdtsc();
+        beginTimer = std::chrono::steady_clock::now();
+        start = __rdtsc();
 
         // Start all the threads
-        for (uint i = 0; i < PROCESSOR_COUNT; i++)
+        for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
             ResumeThread(threads[i]);
         }
 
-        WaitForMultipleObjects(PROCESSOR_COUNT, &threads[0], TRUE, INFINITE);
-
-        auto elapsed_ticks = __rdtsc() - start;
-        auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - beginTimer).count();
+        if (workaroundMultiWait)
+        {
+            // Simulate WaitForMultipleObjects() for objects > MAXIMUM_WAIT_OBJECTS.
+            _getch();
+        }
+        else
+        {
+            auto returnCode = WaitForMultipleObjects(threads.size(), threads.data(), TRUE, INFINITE);
+            if (returnCode != WAIT_OBJECT_0)
+            {
+                DWORD error = GetLastError();
+                printf("WaitForMultipleObjects() failed with error code %d and return code %d\n", error, returnCode);
+                exit(1);
+            }
+            else
+            {
+                StopTimerAndPrint();
+            }
+        }
 
         int totalHardWaits = 0, totalSoftWaits = 0;
         ulong totalIterations = 0;
-        for (uint i = 0; i < PROCESSOR_COUNT; i++)
+        for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
             ThreadInput* outputData = threadInputs[i];
-            assert(outputData->hardWaitCount < numPrimeNumbers);
-            assert(outputData->softWaitCount < numPrimeNumbers);
+            assert(outputData->hardWaitCount <= numPrimeNumbers);
+            assert(outputData->softWaitCount <= numPrimeNumbers);
             totalHardWaits += outputData->hardWaitCount;
             totalSoftWaits += outputData->softWaitCount;
             totalIterations += outputData->totalIterations;
-            PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
+
+            if (!workaroundMultiWait)
+            {
+                PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
+            }
         }
         PRINT_STATS("TOTAL Iterations: %llu, HardWait: %d, SoftWait: %d", totalIterations, totalHardWaits, totalSoftWaits);
-
-        PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
-        PRINT_STATS("Time difference = %lld msec", elapsed_time);
 
         return true;
     }
 };
 
+void PrintUsageAndExit()
+{
+    printf("\nUsage: PrimeNumbers.exe <numPrimeNumbers> <complexity> [*threadCount*]\n");
+    printf("<numPrimeNumbers>: Number of prime numbers per thread.\n");
+    printf("<complexity>: Number between 0~31.\n");
+    printf("Higher the number, bigger the input numbers will beand thus more probability of threads going into hard - waits.\n");
+    printf("If complexity == 0, it will generate uniform, identical inputs from 0~(<numPrimeNumbers> - 1) for all the threads.\n");
+    printf("[*threadCount*]: Optional number of threads to use. By default it will use number of cores available in all groups.\n");
+    exit(1);
+}
+
 int main(int argc, char** argv)
 {
-    if (argc != 3)
+    if (argc <= 2)
     {
-        printf("\nUsage: PrimeNumbers.exe <numPrimeNumbers> <complexity>\n");
-        printf("<numPrimeNumbers>: Number of prime numbers per thread.\n");
-        printf("<complexity>: Number between 0~31.\n");
-        printf("Higher the number, bigger the input numbers will beand thus more probability of threads going into hard - waits.\n");
-        printf("If complexity == 0, it will generate uniform, identical inputs from 0~(<numPrimeNumbers> - 1) for all the threads.\n");
-        return 1;
+        PrintUsageAndExit();
     }
     int numPrimeNumbers = atoi(argv[1]);
     int complexity = atoi(argv[2]) % 32;
+    if (argc == 4)
+    {
+        PROCESSOR_COUNT = atoi(argv[3]);
+    }
+    else if (argc > 4)
+    {
+        PrintUsageAndExit();
+    }
 
+    nRunningProcesses = PROCESSOR_COUNT;
+    InitializeCriticalSection(&coutAccess);
+
+    printf(" Using %s WaitForMultipleObjects() logic.", (nRunningProcesses > MAXIMUM_WAIT_OBJECTS) ? "workaround" : "regular");
     PrimeNumbers p;
     p.PrimeNumbersTest(numPrimeNumbers, complexity);
 

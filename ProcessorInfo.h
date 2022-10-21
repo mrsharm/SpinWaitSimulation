@@ -49,6 +49,7 @@ int GetProcessorCount(void)
 				PROCESSOR_GROUP_INFO& ginfo = info.GroupInfo[i];
 				activeProcessorCount += ginfo.ActiveProcessorCount;
 			}
+			printf("Detected %d active processors amoung %d active groups.", activeProcessorCount, info.ActiveGroupCount);
 			return activeProcessorCount;
 		}
 	}

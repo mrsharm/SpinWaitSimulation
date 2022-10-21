@@ -9,11 +9,22 @@ The program operates on as many threads as number of available processors `N`. I
 ### Usage
 
 ```
-Usage: PrimeNumbers.exe <numPrimeNumbers> <complexity>
+Usage: PrimeNumbers.exe <numPrimeNumbers> <complexity> [*threadCount*]
 <numPrimeNumbers>: Number of prime numbers per thread.
 <complexity>: Number between 0~31.
 Higher the number, bigger the input numbers will beand thus more probability of threads going into hard - waits.
 If complexity == 0, it will generate uniform, identical inputs from 0~(<numPrimeNumbers> - 1) for all the threads.
+[*threadCount*]: Optional number of threads to use. By default it will use number of cores available in all groups.
 ```
 
 A note about `complexity`: This number lets us adjust the approxiamate time each thread would need to find the next prime number. Higher the complexity, more time will be needed for all threads to finish and more chances for threads to go in hard-wait state.
+
+### Sample Usage
+
+1. `PrimeNumbers.exe 100 4`
+
+Create `N` threads and create `100` random numbers between `0 ~ pow(2, 4)` that each thread will operate on. `N` depends on number of active processors present in active group.
+
+2. `PrimeNumbers.exe 100 4 64`
+
+Creates `64` threads and create `100` random numbers between `0 ~ pow(2, 4)` that each thread will operate on.

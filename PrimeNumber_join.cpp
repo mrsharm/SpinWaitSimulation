@@ -72,6 +72,7 @@ struct join_structure
     Volatile<bool> wait_done;
     Volatile<bool> joined_p;
     Volatile<int> join_lock;
+    unsigned __int64 restartStartTime;
 };
 
 EventImpl waitToComplete;
@@ -154,8 +155,9 @@ public:
         return totalIterations;
     }
 
-    void restart(bool isLastIteration)
+    __forceinline void restart(int threadId, int numberIndex, bool isLastIteration)
     {
+        //printf("%d. Restart for Thread# %d\n", numberIndex, threadId);
         join_struct.joined_p = false;
         join_struct.join_lock = join_struct.n_threads;
         int color = join_struct.lock_color.LoadWithoutBarrier();
@@ -165,6 +167,17 @@ public:
         {
             waitToComplete.Set();
         }
+    }
+
+    void recordRestartStartTime()
+    {
+        join_struct.restartStartTime = __rdtsc();
+    }
+
+    unsigned __int64 getTicksSinceRestart()
+    {
+        assert(join_struct.restartStartTime != 0);
+        return __rdtsc() - join_struct.restartStartTime;
     }
 
     bool joined()
@@ -190,6 +203,8 @@ public:
     ulong totalIterations;
     int hardWaitCount;
     int softWaitCount;
+
+    unsigned __int64 wakeupTimeTicks;
 
     ThreadInput(int threadId, int numPrimeNumbers) :
         threadId(threadId),
@@ -266,6 +281,17 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
 
         bool wasHardWait = false;
         tInput->totalIterations += joinData.join(i, threadId, &wasHardWait);
+
+        if (joinData.joined())
+        {
+            joinData.recordRestartStartTime();
+            joinData.restart(tInput->threadId, i, tInput->processed == tInput->count);
+        }
+        else
+        {
+            tInput->wakeupTimeTicks += joinData.getTicksSinceRestart();
+        }
+
         if (wasHardWait)
         {
             tInput->hardWaitCount++;
@@ -273,10 +299,6 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         else
         {
             tInput->softWaitCount++;
-        }
-        if (joinData.joined())
-        {
-            joinData.restart(tInput->processed == tInput->count);
         }
     }
 
@@ -286,8 +308,6 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
 
 class PrimeNumbers
 {
-private:
-
 public:
     /// <summary>
     /// Given a number 'n', each thread finds smallest prime number greater than 'n'.
@@ -376,6 +396,7 @@ public:
 
         int totalHardWaits = 0, totalSoftWaits = 0;
         ulong totalIterations = 0;
+        unsigned __int64 totalWakeupTimeTicks = 0;
         for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
             ThreadInput* outputData = threadInputs[i];
@@ -384,10 +405,15 @@ public:
             totalHardWaits += outputData->hardWaitCount;
             totalSoftWaits += outputData->softWaitCount;
             totalIterations += outputData->totalIterations;
-            PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount);
+            totalWakeupTimeTicks += outputData->wakeupTimeTicks;
+
+            PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->wakeupTimeTicks);
         }
         PRINT_STATS("-----------------------------------------------------------");
-        PRINT_STATS("TOTAL Iterations: %llu, HardWait: %d, SoftWait: %d", totalIterations, totalHardWaits, totalSoftWaits);
+
+#define AVG(n) (n / numPrimeNumbers) + 1
+        
+        PRINT_STATS("(Average) Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), AVG(totalWakeupTimeTicks));
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
         PRINT_STATS("Time difference = %lld msec", elapsed_time);
 

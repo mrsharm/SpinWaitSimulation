@@ -161,8 +161,16 @@ public:
         join_struct.joined_p = false;
         join_struct.join_lock = join_struct.n_threads;
         int color = join_struct.lock_color.LoadWithoutBarrier();
+
+        // Record the start of "wake up time". Do this before changing
+        // the color so we don't have a thread who reaches the place that
+        // measures the "wakeupTimeTicks" before we even record the start
+        // of "restart time".
+        recordRestartStartTime();
+
         join_struct.lock_color = !color;
         join_struct.joined_event[color].Set();
+
         if (isLastIteration)
         {
             waitToComplete.Set();
@@ -282,13 +290,15 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         bool wasHardWait = false;
         tInput->totalIterations += joinData.join(i, threadId, &wasHardWait);
 
+        // The last thread to complete will return here and "restart()".
         if (joinData.joined())
         {
-            joinData.recordRestartStartTime();
             joinData.restart(tInput->threadId, i, tInput->processed == tInput->count);
         }
         else
         {
+            // Other threads that were waiting so long, will record the latency for
+            // wakeup time as soon as things are restarted.
             tInput->wakeupTimeTicks += joinData.getTicksSinceRestart();
         }
 

@@ -421,9 +421,11 @@ public:
         }
         PRINT_STATS("-----------------------------------------------------------");
 
-#define AVG(n) (n / numPrimeNumbers) + 1
+#define AVG_NUMBER(n) (n / numPrimeNumbers) + 1
+#define AVG_THREAD(n) (n / PROCESSOR_COUNT) + 1
         
-        PRINT_STATS("(Average) Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), AVG(totalWakeupTimeTicks));
+        PRINT_STATS("(Average/number) Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalWakeupTimeTicks));
+        PRINT_STATS("(Average/thread) Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalWakeupTimeTicks));
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
         PRINT_STATS("Time difference = %lld msec", elapsed_time);
 

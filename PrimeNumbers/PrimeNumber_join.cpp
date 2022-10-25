@@ -15,6 +15,8 @@
 typedef unsigned long long ulong;
 //_mm_monitorx((const void*)&g_global_location, 0, 0);
 //_mm_mwaitx(2, 0, waitTime);
+#define USE_MWAITX 1
+//#define USE_PAUSE 1
 
 const int SPIN_COUNT = 128 * 1000;
 int PROCESSOR_COUNT = GetProcessorCount();
@@ -112,13 +114,23 @@ public:
             respin:
                 for (int j = 0; j < SPIN_COUNT; j++)
                 {
-                    totalIterations++;
+#ifdef USE_MWAITX
+                    _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
+#endif
                     if (color != join_struct.lock_color.LoadWithoutBarrier())
                     {
                         PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                         break;
                     }
-                    YieldProcessor();           // indicate to the processor that we are spinning
+                    totalIterations++;
+
+#ifdef USE_PAUSE
+                        YieldProcessor();           // indicate to the processor that we are spinning
+#endif
+
+#ifdef USE_MWAITX
+                        _mm_mwaitx(2, 0, 1);
+#endif
                 }
 
                 // we've spun, and if color still hasn't changed, fall into hard wait

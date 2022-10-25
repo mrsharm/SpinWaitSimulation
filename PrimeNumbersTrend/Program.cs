@@ -40,6 +40,7 @@ public class PrimeNumbersTrend {
             FileName = primeNumbersExe,
             Arguments = "",
             RedirectStandardOutput = true,
+            RedirectStandardError = true,
             UseShellExecute = false,
         };
 
@@ -60,7 +61,7 @@ public class PrimeNumbersTrend {
         for (int inputSize = 1; inputSize <= maxInputSize; inputSize++) {
             for (int complex = 0; complex <= maxComplexity; complex++) {
                 for (int thread = 0; thread <= maxThreads; thread++) {
-                    
+
                     List<long> iters_number = new();
                     List<long> hardwait_number = new();
                     List<long> softwait_number = new();
@@ -74,7 +75,9 @@ public class PrimeNumbersTrend {
 
                     // Retry 5 times and take average.
                     for (int iter = 0; iter < 5; iter++) {
-                        var result = RunAndGetResult(inputSize, complex, thread);
+                        var result = RunAndGetResult(iter, inputSize, complex, thread);
+                        if (IsEmpty(result)) continue;
+
                         iters_number.Add(result[0]);
                         hardwait_number.Add(result[1]);
                         softwait_number.Add(result[2]);
@@ -103,29 +106,82 @@ public class PrimeNumbersTrend {
 
             }
         }
+        Console.WriteLine("-------------------------");
         Console.WriteLine(results.ToString());
     }
 
 
-    private static List<long> RunAndGetResult(int inputSize, int complexity, int threads) {
+    private static List<long> RunAndGetResult(int iter, int inputSize, int complexity, int threads) {
         List<long> result = null;
+        StringBuilder stdoutBuilder = new StringBuilder();
+        StringBuilder stderrBuilder = new StringBuilder();
+
         startInfo.Arguments = $"{inputSize} {complexity} ";
 
         if (threads != 0) {
             startInfo.Arguments += $" {threads}";
         }
 
-        Process? process = Process.Start(startInfo);
+        string output = "", error = "";
+        Process process = new Process() {
+            StartInfo = startInfo
+        };
+
+        process.OutputDataReceived += (sender, args) => {
+            if (args.Data != null) {
+                string output = args.Data.ToString();
+                if (!string.IsNullOrEmpty(output)) {
+                    stdoutBuilder.AppendLine(output);
+                }
+                Console.WriteLine(output);
+            }
+        };
+        process.ErrorDataReceived += (sender, args) => {
+            if (args.Data != null) {
+                string error = args.Data?.ToString();
+                if (!string.IsNullOrEmpty(error)) {
+                    stdoutBuilder.AppendLine(error);
+                }
+                Console.WriteLine(error);
+            }
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
 
         if (process != null) {
             process.WaitForExit();
 
             if (process.ExitCode == 0) {
-                var output = process.StandardOutput.ReadToEnd().Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                result = output.Select(x => long.Parse(x)).ToList();
+                output = stdoutBuilder.ToString();
+                error = stderrBuilder.ToString();
+
+                string[] outputLines = output.Split(Environment.NewLine, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                foreach (var outputLine in outputLines) {
+                    if (!outputLine.StartsWith("OUT] ")) {
+                        continue;
+                    }
+                    string resultOutput = outputLine.Replace("OUT] ", string.Empty);
+                    string[] parsedOutput = resultOutput.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    result = parsedOutput.Select(x => long.Parse(x)).ToList();
+                }
+            }
+            else {
+                Console.WriteLine("*** Exitcode " + process.ExitCode);
             }
         }
 
+        if (IsEmpty(result)) {
+            Console.WriteLine("[OUT]: ");
+            Console.WriteLine(output);
+            Console.WriteLine("[ERR]: ");
+            Console.WriteLine(error);
+        }
         return result;
+    }
+
+    private static bool IsEmpty(List<long> result) {
+        return ((result == null) || (result.Count == 0));
     }
 }

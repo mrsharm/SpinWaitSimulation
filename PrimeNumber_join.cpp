@@ -27,6 +27,7 @@ int PROCESSOR_COUNT = GetProcessorCount();
 #define PRINT_SOFT_WAIT(msg, ...) printf("[SOFT WAIT #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_HARD_WAIT(msg, ...) printf("[HARD WAIT #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_RELEASE(msg, ...) printf("[RELEASE #%d] " msg ".\n", __VA_ARGS__);
+#endif
 
 
 #ifndef PRINT_PROGRESS
@@ -53,14 +54,6 @@ int PROCESSOR_COUNT = GetProcessorCount();
 #define PRINT_STATS(msg, ...)
 #endif // !PRINT_STATS
 
-
-#else // !_DEBUG
-#define PRINT_PROGRESS(msg, ...)
-#define PRINT_ANSWER(msg, ...)
-#define PRINT_SOFT_WAIT(msg, ...)
-#define PRINT_HARD_WAIT(msg, ...)
-#define PRINT_RELEASE(msg, ...)
-#endif
 
 
 struct join_structure
@@ -419,15 +412,16 @@ public:
 
             PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->wakeupTimeTicks);
         }
-        PRINT_STATS("-----------------------------------------------------------");
+
 
 #define AVG_NUMBER(n) (n / numPrimeNumbers) + 1
 #define AVG_THREAD(n) (n / PROCESSOR_COUNT) + 1
         
-        PRINT_STATS("(Average/number) Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalWakeupTimeTicks));
-        PRINT_STATS("(Average/thread) Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalWakeupTimeTicks));
+        PRINT_STATS("-----------------------------------------------------------");
+        PRINT_STATS("Average per input_number: Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalWakeupTimeTicks));
+        PRINT_STATS("Average per thread ran  : Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalWakeupTimeTicks));
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
-        PRINT_STATS("Time difference = %lld msec", elapsed_time);
+        PRINT_STATS("Time difference = %lld microseconds", elapsed_time);
 
         return true;
     }
@@ -461,6 +455,7 @@ int main(int argc, char** argv)
         PrintUsageAndExit();
     }
 
+    PRINT_STATS("Starting %d numbers for %d threads", numPrimeNumbers, PROCESSOR_COUNT);
     PrimeNumbers p;
     p.PrimeNumbersTest(numPrimeNumbers, complexity);
 

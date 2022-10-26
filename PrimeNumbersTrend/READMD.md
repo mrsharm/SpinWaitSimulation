@@ -50,6 +50,7 @@ Here is the output of sample executions:
 `PrimeNumbersTrend.exe path\to\PrimeNumbers.exe 10 4`
 
 inputSize|complex|thread|iters_number|hardwait_number|softwait_number|wakeup_number|iters_thread|hardwait_thread|softwait_thread|wakeup_thread|ticks|totalTime
+ --|--|--|--|--|--|--|--|--|--|--|--|--|
 1|0|1|1|0|20|2016102.2|3|17.4|66107.4|100805.6|1|1
 1|1|1|1|1|20|1967887|3|17.6|89463|98395|1|1
 1|2|1|1|2|20|1348815|2.4|19|55391.2|67441.2|1|1.4

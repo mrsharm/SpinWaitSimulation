@@ -129,7 +129,8 @@ public:
             respin:
 
 #ifndef SKIP_SOFT_WAIT
-                for (int j = 0; j < SPIN_COUNT; j++)
+                int j = 0;
+                for (; j < SPIN_COUNT; j++)
                 {
 #ifdef USE_MWAITX
                     _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
@@ -139,8 +140,6 @@ public:
                         PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                         break;
                     }
-                    totalIterations++;
-
 #ifdef USE_PAUSE
                     YieldProcessor();           // indicate to the processor that we are spinning
 #endif // USE_PAUSE
@@ -149,6 +148,7 @@ public:
                     _mm_mwaitx(2, 0, 1);
 #endif // USE_MWAITX
                 }
+                totalIterations += j;
 #endif // SKIP_SOFT_WAIT
 
 #ifndef SKIP_HARD_WAIT

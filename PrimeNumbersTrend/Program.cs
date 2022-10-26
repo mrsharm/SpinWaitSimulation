@@ -34,8 +34,12 @@ public class PrimeNumbersTrend {
         int maxThreads = 1;
         bool useDefaultThreads = true;
         if (args.Length > 3) {
-            maxThreads = Int32.Parse(args[3]);
-            useDefaultThreads = false;
+            int inputThread = Int32.Parse(args[3]);
+            // Ensure we process only valid thread count
+            if (inputThread > 1) {
+                maxThreads = inputThread;
+                useDefaultThreads = false;
+            }
         }
 
         startInfo = new ProcessStartInfo() {
@@ -60,6 +64,13 @@ public class PrimeNumbersTrend {
         results.Append("|totalTime");
         results.AppendLine();
 
+        int progressIteration = 0;
+        int totalIterations = 5 * maxInputSize * (maxComplexity+1);
+        if (!useDefaultThreads) {
+            totalIterations *= maxThreads;
+        }
+        int percentComplete = 5;
+        Console.Write("Progress: 0%");
         for (int inputSize = 1; inputSize <= maxInputSize; inputSize++) {
             for (int complex = 0; complex <= maxComplexity; complex++) {
                 for (int thread = 1; thread <= maxThreads; thread++) {
@@ -90,6 +101,13 @@ public class PrimeNumbersTrend {
                         wakeup_thread.Add(result[7]);
                         ticks.Add(result[8]);
                         totalTime.Add(result[9]);
+
+                        progressIteration++;
+                        int percent = (progressIteration * 100) / totalIterations;
+                        if (percent == percentComplete) {
+                            Console.Write($" {percentComplete}%");
+                            percentComplete += 5;
+                        }
                     }
 
                     results.Append($"{inputSize}|{complex}|{thread}");
@@ -108,6 +126,7 @@ public class PrimeNumbersTrend {
 
             }
         }
+        Console.WriteLine();
         Console.WriteLine("-------------------------");
         Console.WriteLine(results.ToString());
     }
@@ -135,7 +154,7 @@ public class PrimeNumbersTrend {
                 if (!string.IsNullOrEmpty(output)) {
                     stdoutBuilder.AppendLine(output);
                 }
-                Console.WriteLine(output);
+                //Console.WriteLine(output);
             }
         };
         process.ErrorDataReceived += (sender, args) => {

@@ -1,6 +1,17 @@
 Run the PrimeNumbers.exe long enough for various inputs/complexity and dumps the output in csv parseable format.
 
-Just need to compile PrimeNumbers in "Release" mode and do the following change:
+### Usage
+
+```
+Usage: PrimeNumbersTrend.exe <Path> <maxInputSize> <maxComplexity> <maxThreads>?
+<Path>: Full path to PrimeNumbers.exe
+<maxInputSize>: Max Input size.
+<maxComplexity>: Max Complexity.
+<maxThreads>: Optional max threads. By default, it will just run with threads equal to number of logical processors.
+```
+
+### Update PrimeNumbers
+Just compile PrimeNumbers in "Release" mode with following change:
 
 ```diff
 -#define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
@@ -9,8 +20,32 @@ Just need to compile PrimeNumbers in "Release" mode and do the following change:
 +#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
 ```
 
+### Output
 
-PrimeNumbersTrend.exe path\to\PrimeNumbers.exe 10 4
+It displays following data:
+Column name | Meaning
+--|--
+inputSize| Number of input numbers each thread will operate upon
+complex| Cost of execution for each input number. More complexity means bigger input number and hence more time each thread will take to complete
+thread| Number of threads. If <maxThreads> is not passed, this will always be same as no. of logical processors
+iters_number| Average iterations threads had to spin for processing **each input number**
+hardwait_number| Average hard waits threads made for processing **each input number**
+softwait_number| Average soft waits threads made for processing **each input number**
+wakeup_number| Average clock cycles threads took to wake-up since restart while processing **each input number**
+iters_thread| Average iterations taken to process input numbers by **each thread**
+hardwait_thread| Average hard waits made to process input numbers by **each thread**
+softwait_thread| Average soft waits made to process input numbers by **each thread**
+wakeup_thread| Average clock cycles took to wake-up since restart to process input numbers by **each thread**
+ticks| Total clock cycles taken to process entire input.
+totalTime | Total time in microseconds taken to process entire input.
+
+Note: `*_number` shows metrics to process `per input number` while `*_thread` shows metrics to process `per thread`.
+
+### Sample output
+
+Here is the output of sample executions:
+
+`PrimeNumbersTrend.exe path\to\PrimeNumbers.exe 10 4`
 
 inputSize|complex|thread|iters_number|hardwait_number|softwait_number|wakeup_number|iters_thread|hardwait_thread|softwait_thread|wakeup_thread|ticks|totalTime
 --|--|--|--|--|--|--|--|--|--|--|--|--|

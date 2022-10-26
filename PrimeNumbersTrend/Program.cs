@@ -31,9 +31,11 @@ public class PrimeNumbersTrend {
 
         int maxInputSize = Int32.Parse(args[1]);
         int maxComplexity = Int32.Parse(args[2]);
-        int maxThreads = 0;
+        int maxThreads = 1;
+        bool useDefaultThreads = true;
         if (args.Length > 3) {
             maxThreads = Int32.Parse(args[3]);
+            useDefaultThreads = false;
         }
 
         startInfo = new ProcessStartInfo() {
@@ -60,7 +62,7 @@ public class PrimeNumbersTrend {
 
         for (int inputSize = 1; inputSize <= maxInputSize; inputSize++) {
             for (int complex = 0; complex <= maxComplexity; complex++) {
-                for (int thread = 0; thread <= maxThreads; thread++) {
+                for (int thread = 1; thread <= maxThreads; thread++) {
 
                     List<long> iters_number = new();
                     List<long> hardwait_number = new();
@@ -75,7 +77,7 @@ public class PrimeNumbersTrend {
 
                     // Retry 5 times and take average.
                     for (int iter = 0; iter < 5; iter++) {
-                        var result = RunAndGetResult(iter, inputSize, complex, thread);
+                        var result = RunAndGetResult(iter, inputSize, complex, useDefaultThreads ? 0 : thread);
                         if (IsEmpty(result)) continue;
 
                         iters_number.Add(result[0]);

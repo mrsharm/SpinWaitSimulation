@@ -13,10 +13,25 @@
 #include "ProcessorInfo.h"
 
 typedef unsigned long long ulong;
-//_mm_monitorx((const void*)&g_global_location, 0, 0);
-//_mm_mwaitx(2, 0, waitTime);
-#define USE_MWAITX 1
-//#define USE_PAUSE 1
+
+// Can just have one of the two.
+//#define USE_MWAITX 1
+#define USE_PAUSE 1
+
+#if defined(USE_MWAITX) && defined(USE_PAUSE)
+// Trigger compilation failure
+1
+#endif
+
+// Uncomment depending on what wait we want to skip.
+//#define SKIP_HARD_WAIT 1
+//#define SKIP_SOFT_WAIT 1
+
+// Can't skip both
+#if defined(SKIP_HARD_WAIT) && defined(SKIP_SOFT_WAIT)
+// Trigger compilation failure
+1
+#endif
 
 const int SPIN_COUNT = 128 * 1000;
 int PROCESSOR_COUNT = GetProcessorCount();
@@ -112,11 +127,13 @@ public:
             if (color == join_struct.lock_color.LoadWithoutBarrier())
             {
             respin:
+
+#ifndef SKIP_SOFT_WAIT
                 for (int j = 0; j < SPIN_COUNT; j++)
                 {
 #ifdef USE_MWAITX
                     _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
-#endif
+#endif // USE_MWAITX
                     if (color != join_struct.lock_color.LoadWithoutBarrier())
                     {
                         PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
@@ -125,14 +142,16 @@ public:
                     totalIterations++;
 
 #ifdef USE_PAUSE
-                        YieldProcessor();           // indicate to the processor that we are spinning
-#endif
+                    YieldProcessor();           // indicate to the processor that we are spinning
+#endif // USE_PAUSE
 
 #ifdef USE_MWAITX
-                        _mm_mwaitx(2, 0, 1);
-#endif
+                    _mm_mwaitx(2, 0, 1);
+#endif // USE_MWAITX
                 }
+#endif // SKIP_SOFT_WAIT
 
+#ifndef SKIP_HARD_WAIT
                 // we've spun, and if color still hasn't changed, fall into hard wait
                 if (color == join_struct.lock_color.LoadWithoutBarrier())
                 {
@@ -146,6 +165,7 @@ public:
                         exit(1);
                     }
                 }
+#endif // SKIP_HARD_WAIT
 
                 // avoid race due to the thread about to reset the event (occasionally) being preempted before ResetEvent()
                 if (color == join_struct.lock_color.LoadWithoutBarrier())

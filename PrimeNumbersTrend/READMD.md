@@ -61,6 +61,7 @@ Here is the output of sample executions:
 `PrimeNumbersTrend.exe path\to\PrimeNumbers.exe 10 5
 
 inputSize|complex|thread|iters_per_number|hardwait_per_number|softwait_per_number|hardWaitWakeup_per_number|softWaitWakeup_per_number|iters_number_allthreads|hardwait_number_allthreads|softwait_number_allthreads|hardWaitWakeup_number_allthreads|softWaitWakeup_number_allthreads|iters_thread_allnumbers|hardwait_thread_allnumbers|softwait_thread_allnumbers|hardWaitWakeup_thread_allnumbers|softWaitWakeup_thread_allnumbers|ticks|totalTime
+ --|--|--|--|--|--|--|--|--|--|--|--|--|
 --|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|
 1|0|1|33174.8|1|1.8|2127.2|2268.6|663492|1.6|20.4|42528.8|45359.2|33174.8|1|1.8|2127.2|2268.6|6591518.4|1783.2
 1|1|1|51735.4|1|1.6|1707.6|1858.8|1034702.2|1.8|20.2|34141.6|37171.6|51735.4|1|1.6|1707.6|1858.8|8458439.8|2288.4
@@ -112,7 +113,7 @@ inputSize|complex|thread|iters_per_number|hardwait_per_number|softwait_per_numbe
 8|5|1|1737.6|1|2|323.6|442.2|34748|1|21|6465|8831.6|13899.4|1|9|2586.2|3532.8|4013504.2|1085.8
 9|0|1|16934|1|1.6|107977.2|107948|338671.6|1.2|20.4|2159538.2|2158947.8|152402.6|1|9.6|971792.6|971526.8|22097372.2|5978.8
 9|1|1|9409.2|1|1.8|29097.8|29215.8|188175|1.2|20.6|581950.2|584306.6|84679|1|9.8|261877.8|262938.2|12884150.4|3486.2
-9|2|1|1505.2|1|2|347.6|466.8|30091.6|1|21|6939|9328.8|13541.6|1|10|3122.8|4198.2|3617946|978.8
+
 9|3|1|10299.2|1|1.6|33944.2|34039|205974.8|1.2|20.4|678875.4|680772.6|92689|1|9.6|305494.4|306347.6|13942545.2|3772
 9|4|1|29471.6|1|1.6|183150.6|182799.8|589418.2|2.2|19.6|3663000.2|3655989.8|265238.4|1.4|9.2|1648350.2|1645195.4|37691082.4|10197.8
 9|5|1|33479.2|1|1.6|359511.4|359253.8|669573.2|2.8|18.8|7190215.6|7185064.4|301308.2|1.8|8.8|3235597.2|3233279.4|43580664.2|11791.6

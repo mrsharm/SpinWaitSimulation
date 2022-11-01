@@ -37,7 +37,7 @@ const int SPIN_COUNT = 128 * 1000;
 int PROCESSOR_COUNT = GetProcessorCount();
 
 #define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
-//#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
+#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
 
 #ifdef _DEBUG
 #define PRINT_PROGRESS(msg, ...) printf("[PROGRESS #%d] " msg ".\n", __VA_ARGS__);
@@ -450,17 +450,20 @@ public:
         }
 
 
+#define AVG(n) (n / (numPrimeNumbers * PROCESSOR_COUNT)) + 1
 #define AVG_NUMBER(n) (n / numPrimeNumbers) + 1
 #define AVG_THREAD(n) (n / PROCESSOR_COUNT) + 1
 
         PRINT_STATS("-----------------------------------------------------------");
-        PRINT_STATS("Average per input_number: Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalWakeupTimeTicks));
-        PRINT_STATS("Average per thread ran  : Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalWakeupTimeTicks));
+        PRINT_STATS("Average per input_number: Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), AVG(totalWakeupTimeTicks));
+        PRINT_STATS("Average per input_number (all threads): Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalWakeupTimeTicks));
+        PRINT_STATS("Average per thread ran  (all iterations): Iterations: %llu, HardWait: %d, SoftWait: %d, WakeupTime: %llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalWakeupTimeTicks));
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
         PRINT_STATS("Time difference = %lld microseconds", elapsed_time);
 
-        PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%d|%d|%llu|%llu|%llu",
+        PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%d|%d|%llu|%llu|%d|%d|%llu|%llu|%llu",
             numPrimeNumbers, complexity, PROCESSOR_COUNT,
+            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), AVG(totalWakeupTimeTicks),
             AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalWakeupTimeTicks),
             AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalWakeupTimeTicks),
             elapsed_ticks, elapsed_time);

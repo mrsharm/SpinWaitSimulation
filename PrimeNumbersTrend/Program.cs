@@ -52,14 +52,18 @@ public class PrimeNumbersTrend {
 
         StringBuilder results = new StringBuilder();
         results.Append("inputSize|complex|thread");
-        results.Append("|iters_number");
-        results.Append("|hardwait_number");
-        results.Append("|softwait_number");
-        results.Append("|wakeup_number");
-        results.Append("|iters_thread");
-        results.Append("|hardwait_thread");
-        results.Append("|softwait_thread");
-        results.Append("|wakeup_thread");
+        results.Append("|iters_per_number");
+        results.Append("|hardwait_per_number");
+        results.Append("|softwait_per_number");
+        results.Append("|wakeup_per_number");
+        results.Append("|iters_number_allthreads");
+        results.Append("|hardwait_number_allthreads");
+        results.Append("|softwait_number_allthreads");
+        results.Append("|wakeup_number_allthreads");
+        results.Append("|iters_thread_allnumbers");
+        results.Append("|hardwait_thread_allnumbers");
+        results.Append("|softwait_thread_allnumbers");
+        results.Append("|wakeup_thread_allnumbers");
         results.Append("|ticks");
         results.Append("|totalTime");
         results.AppendLine();
@@ -74,7 +78,10 @@ public class PrimeNumbersTrend {
         for (int inputSize = 1; inputSize <= maxInputSize; inputSize++) {
             for (int complex = 0; complex <= maxComplexity; complex++) {
                 for (int thread = 1; thread <= maxThreads; thread++) {
-
+                    List<long> iters_pernumber = new();
+                    List<long> hardwait_pernumber = new();
+                    List<long> softwait_pernumber = new();
+                    List<long> wakeup_pernumber = new();
                     List<long> iters_number = new();
                     List<long> hardwait_number = new();
                     List<long> softwait_number = new();
@@ -91,16 +98,20 @@ public class PrimeNumbersTrend {
                         var result = RunAndGetResult(iter, inputSize, complex, useDefaultThreads ? 0 : thread);
                         if (IsEmpty(result)) continue;
 
-                        iters_number.Add(result[0]);
-                        hardwait_number.Add(result[1]);
-                        softwait_number.Add(result[2]);
-                        wakeup_number.Add(result[3]);
-                        iters_thread.Add(result[4]);
-                        hardwait_thread.Add(result[5]);
-                        softwait_thread.Add(result[6]);
-                        wakeup_thread.Add(result[7]);
-                        ticks.Add(result[8]);
-                        totalTime.Add(result[9]);
+                        iters_pernumber.Add(result[0]);
+                        hardwait_pernumber.Add(result[1]);
+                        softwait_pernumber.Add(result[2]);
+                        wakeup_pernumber.Add(result[3]);
+                        iters_number.Add(result[4]);
+                        hardwait_number.Add(result[5]);
+                        softwait_number.Add(result[6]);
+                        wakeup_number.Add(result[7]);
+                        iters_thread.Add(result[8]);
+                        hardwait_thread.Add(result[9]);
+                        softwait_thread.Add(result[10]);
+                        wakeup_thread.Add(result[11]);
+                        ticks.Add(result[12]);
+                        totalTime.Add(result[13]);
 
                         progressIteration++;
                         int percent = (progressIteration * 100) / totalIterations;
@@ -111,6 +122,10 @@ public class PrimeNumbersTrend {
                     }
 
                     results.Append($"{inputSize}|{complex}|{thread}");
+                    results.Append($"|{iters_pernumber.Average()}");
+                    results.Append($"|{hardwait_pernumber.Average()}");
+                    results.Append($"|{softwait_pernumber.Average()}");
+                    results.Append($"|{wakeup_pernumber.Average()}");
                     results.Append($"|{iters_number.Average()}");
                     results.Append($"|{hardwait_number.Average()}");
                     results.Append($"|{softwait_number.Average()}");

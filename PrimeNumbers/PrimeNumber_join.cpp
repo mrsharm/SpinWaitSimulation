@@ -20,7 +20,7 @@ typedef unsigned long long ulong;
 
 #if defined(USE_MWAITX) && defined(USE_PAUSE)
 // Trigger compilation failure
-1
+"Cannot have both USE_MWAITX and USE_PAUSE";
 #endif
 
 // Uncomment depending on what wait we want to skip.
@@ -30,7 +30,7 @@ typedef unsigned long long ulong;
 // Can't skip both
 #if defined(SKIP_HARD_WAIT) && defined(SKIP_SOFT_WAIT)
 // Trigger compilation failure
-1
+"Cannot have both SKIP_HARD_WAIT and SKIP_SOFT_WAIT";
 #endif
 
 const int SPIN_COUNT = 128 * 1000;
@@ -447,7 +447,7 @@ public:
         }
 
         unsigned __int64 elapsed_ticks = __rdtsc() - start;
-        auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - beginTimer).count();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - beginTimer).count();
 
         int totalHardWaits = 0, totalSoftWaits = 0;
         ulong totalIterations = 0;
@@ -477,7 +477,7 @@ public:
         PRINT_STATS("Average per input_number (all threads): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalHardWaitWakeupTimeTicks), AVG_NUMBER(totalSoftWaitWakeupTimeTicks));
         PRINT_STATS("Average per thread ran  (all iterations): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalHardWaitWakeupTimeTicks), AVG_THREAD(totalSoftWaitWakeupTimeTicks));
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
-        PRINT_STATS("Time difference = %lld microseconds", elapsed_time);
+        PRINT_STATS("Time difference = %lld milliseconds", elapsed_time);
 
         PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu",
             numPrimeNumbers, complexity, PROCESSOR_COUNT,

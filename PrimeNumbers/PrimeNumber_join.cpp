@@ -86,8 +86,7 @@ struct join_structure
     Volatile<bool> wait_done;
     Volatile<bool> joined_p;
     Volatile<int> join_lock;
-    unsigned __int64 restartSoftWaitStartTime;
-    unsigned __int64 restartHardWaitStartTime;
+    unsigned __int64 restartStartTime;
 };
 
 EventImpl waitToComplete;
@@ -196,11 +195,8 @@ public:
         // the color so we don't have a thread who reaches the place that
         // measures the "wakeupTimeTicks" before we even record the start
         // of "restart time".
-        recordRestartSoftWaitStartTime();
+        recordRestartStartTime();
         join_struct.lock_color = !color;
-
-        // Same for hard-wait
-        recordRestartHardWaitStartTime();
         join_struct.joined_event[color].Set();
 
         if (isLastIteration)
@@ -209,26 +205,15 @@ public:
         }
     }
 
-    __forceinline void recordRestartSoftWaitStartTime()
+    __forceinline void recordRestartStartTime()
     {
-        join_struct.restartSoftWaitStartTime = __rdtsc();
+        join_struct.restartStartTime = __rdtsc();
     }
 
-    __forceinline void recordRestartHardWaitStartTime()
-    {
-        join_struct.restartHardWaitStartTime = __rdtsc();
-    }
-
-    __forceinline unsigned __int64 getTicksSinceRestartSoftWait()
+    __forceinline unsigned __int64 getTicksSinceRestart()
     {
         assert(join_struct.restartSoftWaitStartTime != 0);
-        return __rdtsc() - join_struct.restartSoftWaitStartTime;
-    }
-
-    __forceinline unsigned __int64 getTicksSinceRestartHardWait()
-    {
-        assert(join_struct.restartHardWaitStartTime != 0);
-        return __rdtsc() - join_struct.restartHardWaitStartTime;
+        return __rdtsc() - join_struct.restartStartTime;
     }
 
     bool joined()
@@ -343,17 +328,18 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         {
             // Other threads that were waiting so long, will record the latency for
             // wakeup time as soon as things are restarted.
-            tInput->softWaitWakeupTimeTicks += joinData.getTicksSinceRestartSoftWait();
-            tInput->hardWaitWakeupTimeTicks += joinData.getTicksSinceRestartHardWait();
-        }
 
-        if (wasHardWait)
-        {
-            tInput->hardWaitCount++;
-        }
-        else
-        {
-            tInput->softWaitCount++;
+            if (wasHardWait)
+            {
+                tInput->hardWaitCount++;
+                tInput->hardWaitWakeupTimeTicks += joinData.getTicksSinceRestart();
+
+            }
+            else
+            {
+                tInput->softWaitCount++;
+                tInput->softWaitWakeupTimeTicks += joinData.getTicksSinceRestart();
+            }
         }
     }
 

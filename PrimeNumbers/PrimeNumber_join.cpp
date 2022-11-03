@@ -54,7 +54,7 @@ typedef unsigned long long ulong;
 #endif
 
 const int SPIN_COUNT = 128 * 1000;
-int PROCESSOR_COUNT = GetProcessorCount();
+int PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT;
 
 #if defined(USE_MWAITX_NOLOOP) || defined(USE_MWAITX)
 unsigned int MWAITX_CYCLES = 0;
@@ -407,7 +407,7 @@ public:
     /// <returns></returns>
     bool PrimeNumbersTest(int numPrimeNumbers, int complexity)
     {
-        std::vector<HANDLE> threads(PROCESSOR_COUNT);
+        std::vector<HANDLE> threadHandles(PROCESSOR_COUNT);
         std::vector<DWORD> threadIds(PROCESSOR_COUNT);
         std::vector<ThreadInput*> threadInputs(PROCESSOR_COUNT);
         joinData.init(PROCESSOR_COUNT);
@@ -438,7 +438,7 @@ public:
             }
 
             DWORD tid;
-            threads[i] = CreateThread(
+            threadHandles[i] = CreateThread(
                 NULL,                           // default security attributes
                 0,                              // use default stack size
                 ThreadWorker,                   // thread function name
@@ -452,8 +452,11 @@ public:
             wchar_t buffer[15];
             wsprintf(buffer, L"Thread# %d", i);
 
-            SetThreadDescription(threads[i], buffer);
+            SetThreadDescription(threadHandles[i], buffer);
         }
+
+        // Hard affinitize the threads to cores.
+        SetThreadAffinity(PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT > 1, threadHandles);
 
         // Create an event to wait for all threads to complete.
         waitToComplete.CreateManualEvent(false);
@@ -465,7 +468,7 @@ public:
         // Start all the threads
         for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
-            ResumeThread(threads[i]);
+            ResumeThread(threadHandles[i]);
         }
 
         // Wait till last thread would signal that it is done.
@@ -545,6 +548,8 @@ void PrintUsageAndExit()
 
 int main(int argc, char** argv)
 {
+    GetProcessorInfo(&PROCESSOR_COUNT, &PROCESSOR_GROUP_COUNT);
+
     if (argc <= 2)
     {
         PrintUsageAndExit();

@@ -15,12 +15,32 @@
 typedef unsigned long long ulong;
 
 // Can just have one of the two.
+//#define USE_MWAITX_NOLOOP 1
 //#define USE_MWAITX 1
 #define USE_PAUSE 1
 
 #if defined(USE_MWAITX) && defined(USE_PAUSE)
 // Trigger compilation failure
 "Cannot have both USE_MWAITX and USE_PAUSE";
+#endif
+
+#if defined(USE_MWAITX_NOLOOP) && defined(USE_PAUSE)
+// Trigger compilation failure
+"Cannot have both USE_MWAITX_NOLOOP and USE_PAUSE";
+#endif
+
+#if defined(USE_MWAITX_NOLOOP) && defined(USE_MWAITX)
+// Trigger compilation failure
+"Cannot have both USE_MWAITX_NOLOOP and USE_MWAITX";
+#endif
+
+#if !defined(USE_MWAITX_NOLOOP) && !defined(USE_MWAITX) && !defined(USE_PAUSE)
+// Trigger compilation failure
+"Need to use one of USE_MWAITX_NOLOOP, USE_MWAITX and USE_PAUSE";
+#endif
+
+#if defined(USE_MWAITX_NOLOOP)
+#define SKIP_SOFT_WAIT 1
 #endif
 
 // Uncomment depending on what wait we want to skip.
@@ -36,8 +56,12 @@ typedef unsigned long long ulong;
 const int SPIN_COUNT = 128 * 1000;
 int PROCESSOR_COUNT = GetProcessorCount();
 
+#if defined(USE_MWAITX_NOLOOP) || defined(USE_MWAITX)
+unsigned int MWAITX_CYCLES = 0;
+#endif
+
 #define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
-#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
+//#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
 
 #ifdef _DEBUG
 #define PRINT_PROGRESS(msg, ...) printf("[PROGRESS #%d] " msg ".\n", __VA_ARGS__);
@@ -127,7 +151,17 @@ public:
             if (color == join_struct.lock_color.LoadWithoutBarrier())
             {
             respin:
-
+#ifdef USE_MWAITX_NOLOOP
+                _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
+                _mm_mwaitx(2, 0, MWAITX_CYCLES);
+                totalIterations += 1;
+                //auto before_waitx = __rdtsc();
+                ////_mm_monitorx((const void*)&totalIterations, 0, 0);
+                //_mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
+                //_mm_mwaitx(2, 0, MWAITX_CYCLES);
+                //auto after_waitx = __rdtsc();
+                //printf("actual: %u, MWAITX_CYCLES: %d\n", (after_waitx - before_waitx), MWAITX_CYCLES);
+#endif
 #ifndef SKIP_SOFT_WAIT
                 int j = 0;
                 for (; j < SPIN_COUNT; j++)
@@ -145,7 +179,7 @@ public:
 #endif // USE_PAUSE
 
 #ifdef USE_MWAITX
-                    _mm_mwaitx(2, 0, 1);
+                    _mm_mwaitx(2, 0, MWAITX_CYCLES);
 #endif // USE_MWAITX
                 }
                 totalIterations += j;
@@ -519,14 +553,20 @@ int main(int argc, char** argv)
     int complexity = atoi(argv[2]) % 32;
     if (argc == 4)
     {
+#ifdef USE_PAUSE
         PROCESSOR_COUNT = atoi(argv[3]);
+        PRINT_STATS("Starting %d numbers for %d threads", numPrimeNumbers, PROCESSOR_COUNT);
+#elif defined(USE_MWAITX) || defined(USE_MWAITX_NOLOOP)
+        MWAITX_CYCLES = atoi(argv[3]);
+        PRINT_STATS("Starting %d numbers for %d cycles", numPrimeNumbers, MWAITX_CYCLES);
+#endif
+        
     }
     else if (argc > 4)
     {
         PrintUsageAndExit();
     }
-
-    PRINT_STATS("Starting %d numbers for %d threads", numPrimeNumbers, PROCESSOR_COUNT);
+    
     PrimeNumbers p;
     p.PrimeNumbersTest(numPrimeNumbers, complexity);
 

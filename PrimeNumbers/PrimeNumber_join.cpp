@@ -212,7 +212,7 @@ public:
 
     __forceinline unsigned __int64 getTicksSinceRestart()
     {
-        assert(join_struct.restartSoftWaitStartTime != 0);
+        assert(join_struct.restartStartTime != 0);
         return __rdtsc() - join_struct.restartStartTime;
     }
 
@@ -349,6 +349,18 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
 
 class PrimeNumbers
 {
+private:
+    void DiffWakeTime(ulong hardWaitWakeTime, ulong softWaitWakeTime, ulong* diff, char* diffCh)
+    {
+        *diffCh = ' ';
+        *diff = hardWaitWakeTime - softWaitWakeTime;
+        if (hardWaitWakeTime < softWaitWakeTime)
+        {
+            *diffCh = '-';
+            *diff = softWaitWakeTime - hardWaitWakeTime;
+        }
+    }
+
 public:
     /// <summary>
     /// Given a number 'n', each thread finds smallest prime number greater than 'n'.
@@ -441,6 +453,8 @@ public:
         unsigned __int64 totalHardWaitWakeupTimeTicks = 0;
         for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
+            char diffCh;
+            ulong diff;
             ThreadInput* outputData = threadInputs[i];
             assert(outputData->hardWaitCount <= numPrimeNumbers);
             assert(outputData->softWaitCount <= numPrimeNumbers);
@@ -450,7 +464,8 @@ public:
             totalSoftWaitWakeupTimeTicks += outputData->softWaitWakeupTimeTicks;
             totalHardWaitWakeupTimeTicks += outputData->hardWaitWakeupTimeTicks;
 
-            PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks);
+            DiffWakeTime(outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, &diff, &diffCh);
+            PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, diffCh, diff);
         }
 
 
@@ -458,10 +473,17 @@ public:
 #define AVG_NUMBER(n) (n / numPrimeNumbers) + 1
 #define AVG_THREAD(n) (n / PROCESSOR_COUNT) + 1
 
+        ulong avgDiff, avgNumberDiff, avgThreadDiff;
+        char avgDiffChar, avgNumberDiffChar, avgThreadDiffChar;
+
+        DiffWakeTime(AVG(totalHardWaitWakeupTimeTicks), AVG(totalSoftWaitWakeupTimeTicks), &avgDiff, &avgDiffChar);
+        DiffWakeTime(AVG_NUMBER(totalHardWaitWakeupTimeTicks), AVG_NUMBER(totalSoftWaitWakeupTimeTicks), &avgNumberDiff, &avgNumberDiffChar);
+        DiffWakeTime(AVG_THREAD(totalHardWaitWakeupTimeTicks), AVG_THREAD(totalSoftWaitWakeupTimeTicks), &avgThreadDiff, &avgThreadDiffChar);
+
         PRINT_STATS("-----------------------------------------------------------");
-        PRINT_STATS("Average per input_number: Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu", AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), AVG(totalHardWaitWakeupTimeTicks), AVG(totalSoftWaitWakeupTimeTicks));
-        PRINT_STATS("Average per input_number (all threads): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalHardWaitWakeupTimeTicks), AVG_NUMBER(totalSoftWaitWakeupTimeTicks));
-        PRINT_STATS("Average per thread ran  (all iterations): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalHardWaitWakeupTimeTicks), AVG_THREAD(totalSoftWaitWakeupTimeTicks));
+        PRINT_STATS("Average per input_number: Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), AVG(totalHardWaitWakeupTimeTicks), AVG(totalSoftWaitWakeupTimeTicks), avgDiffChar, avgDiff);
+        PRINT_STATS("Average per input_number (all threads): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalHardWaitWakeupTimeTicks), AVG_NUMBER(totalSoftWaitWakeupTimeTicks), avgNumberDiffChar, avgNumberDiff);
+        PRINT_STATS("Average per thread ran  (all iterations): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalHardWaitWakeupTimeTicks), AVG_THREAD(totalSoftWaitWakeupTimeTicks), avgThreadDiffChar, avgThreadDiff);
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
         PRINT_STATS("Time difference = %lld milliseconds", elapsed_time);
 

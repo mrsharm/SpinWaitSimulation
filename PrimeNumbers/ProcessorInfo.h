@@ -1,10 +1,11 @@
 // Adopted from https://github.com/umezawatakeshi/GetLogicalProcessorInformationEx/blob/master/GetLogicalProcessorInformationEx.cc
 #include <Windows.h>
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+
 
 class GroupProcNo
 {
@@ -116,7 +117,7 @@ void SetThreadAffinity(int processorCount, bool isMultiCpuGroup, std::vector<HAN
 		}
 		else
 		{
-			BOOL result = SetThreadAffinityMask(threadHandles[procNo], (DWORD_PTR)1 << groupProcNo.GetProcIndex());
+			DWORD_PTR result = SetThreadAffinityMask(threadHandles[procNo], (DWORD_PTR)1 << groupProcNo.GetProcIndex());
 			if (result == 0)
 			{
 				printf("SetThreadGroupAffinity returned 0 for processor %d. GetLastError() = %u\n", procNo, GetLastError());

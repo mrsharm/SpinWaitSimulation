@@ -1,0 +1,46 @@
+#pragma once
+#include "EventImpl.h"
+
+#define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
+//#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
+
+#ifdef _DEBUG
+#define PRINT_PROGRESS(msg, ...) printf("[PROGRESS #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_ANSWER(msg, ...) printf("[ANSWER #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_SOFT_WAIT(msg, ...) printf("[SOFT WAIT #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_HARD_WAIT(msg, ...) printf("[HARD WAIT #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_RELEASE(msg, ...) printf("[RELEASE #%d] " msg ".\n", __VA_ARGS__);
+#endif
+
+
+#ifndef PRINT_PROGRESS
+#define PRINT_PROGRESS(msg, ...)
+#endif // !PRINT_PROGRESS
+
+#ifndef  PRINT_ANSWER
+#define PRINT_ANSWER(msg, ...)
+#endif // ! PRINT_ANSWER
+
+#ifndef PRINT_SOFT_WAIT
+#define PRINT_SOFT_WAIT(msg, ...)
+#endif // !PRINT_SOFT_WAIT
+
+#ifndef PRINT_HARD_WAIT
+#define PRINT_HARD_WAIT(msg, ...)
+#endif // !PRINT_SOFT_WAIT
+
+#ifndef PRINT_RELEASE
+#define PRINT_RELEASE(msg, ...)
+#endif // !PRINT_RELEASE
+
+#ifndef PRINT_STATS
+#define PRINT_STATS(msg, ...)
+#endif // !PRINT_STATS
+
+#ifndef PRINT_ONELINE_STATS
+#define PRINT_ONELINE_STATS(msg, ...)
+#endif // !PRINT_ONELINE_STATS
+
+typedef unsigned long long ulong;
+
+const int SPIN_COUNT = 128 * 1000;

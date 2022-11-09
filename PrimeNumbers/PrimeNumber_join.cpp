@@ -8,253 +8,14 @@
 #include <queue>
 #include <thread>
 #include <chrono>
-#include "Volatile.h"
-#include "EventImpl.h"
 #include "ProcessorInfo.h"
-
-typedef unsigned long long ulong;
-
-// Can just have one of the two.
-//#define USE_MWAITX_NOLOOP 1
-//#define USE_MWAITX 1
-#define USE_PAUSE 1
-
-#if defined(USE_MWAITX) && defined(USE_PAUSE)
-// Trigger compilation failure
-"Cannot have both USE_MWAITX and USE_PAUSE";
-#endif
-
-#if defined(USE_MWAITX_NOLOOP) && defined(USE_PAUSE)
-// Trigger compilation failure
-"Cannot have both USE_MWAITX_NOLOOP and USE_PAUSE";
-#endif
-
-#if defined(USE_MWAITX_NOLOOP) && defined(USE_MWAITX)
-// Trigger compilation failure
-"Cannot have both USE_MWAITX_NOLOOP and USE_MWAITX";
-#endif
-
-#if !defined(USE_MWAITX_NOLOOP) && !defined(USE_MWAITX) && !defined(USE_PAUSE)
-// Trigger compilation failure
-"Need to use one of USE_MWAITX_NOLOOP, USE_MWAITX and USE_PAUSE";
-#endif
-
-#if defined(USE_MWAITX_NOLOOP)
-#define SKIP_SOFT_WAIT 1
-#endif
-
-// Uncomment depending on what wait we want to skip.
-//#define SKIP_HARD_WAIT 1
-//#define SKIP_SOFT_WAIT 1
-
-// Can't skip both
-#if defined(SKIP_HARD_WAIT) && defined(SKIP_SOFT_WAIT)
-// Trigger compilation failure
-"Cannot have both SKIP_HARD_WAIT and SKIP_SOFT_WAIT";
-#endif
-
-const int SPIN_COUNT = 128 * 1000;
-int PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT;
-
-#if defined(USE_MWAITX_NOLOOP) || defined(USE_MWAITX)
-unsigned int MWAITX_CYCLES = 0;
-#endif
-
-#define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
-//#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
-
-#ifdef _DEBUG
-#define PRINT_PROGRESS(msg, ...) printf("[PROGRESS #%d] " msg ".\n", __VA_ARGS__);
-#define PRINT_ANSWER(msg, ...) printf("[ANSWER #%d] " msg ".\n", __VA_ARGS__);
-#define PRINT_SOFT_WAIT(msg, ...) printf("[SOFT WAIT #%d] " msg ".\n", __VA_ARGS__);
-#define PRINT_HARD_WAIT(msg, ...) printf("[HARD WAIT #%d] " msg ".\n", __VA_ARGS__);
-#define PRINT_RELEASE(msg, ...) printf("[RELEASE #%d] " msg ".\n", __VA_ARGS__);
-#endif
+#include "common.h"
+#include "t_join.h"
 
 
-#ifndef PRINT_PROGRESS
-#define PRINT_PROGRESS(msg, ...)
-#endif // !PRINT_PROGRESS
-
-#ifndef  PRINT_ANSWER
-#define PRINT_ANSWER(msg, ...)
-#endif // ! PRINT_ANSWER
-
-#ifndef PRINT_SOFT_WAIT
-#define PRINT_SOFT_WAIT(msg, ...)
-#endif // !PRINT_SOFT_WAIT
-
-#ifndef PRINT_HARD_WAIT
-#define PRINT_HARD_WAIT(msg, ...)
-#endif // !PRINT_SOFT_WAIT
-
-#ifndef PRINT_RELEASE
-#define PRINT_RELEASE(msg, ...)
-#endif // !PRINT_RELEASE
-
-#ifndef PRINT_STATS
-#define PRINT_STATS(msg, ...)
-#endif // !PRINT_STATS
-
-#ifndef PRINT_ONELINE_STATS
-#define PRINT_ONELINE_STATS(msg, ...)
-#endif // !PRINT_ONELINE_STATS
-
-
-struct join_structure
-{
-    // Shared non volatile keep on separate line to prevent eviction
-    int n_threads;
-    EventImpl joined_event[3];
-    Volatile<int> lock_color;
-    Volatile<bool> wait_done;
-    Volatile<bool> joined_p;
-    Volatile<int> join_lock;
-    unsigned __int64 restartStartTime;
-};
-
-EventImpl waitToComplete;
-
-class t_join
-{
-    join_structure join_struct;
-
-public:
-    bool init(int n_th)
-    {
-        join_struct.n_threads = n_th;
-        join_struct.lock_color = 0;
-        for (int i = 0; i < 3; i++)
-        {
-            if (!join_struct.joined_event[i].IsValid())
-            {
-                join_struct.joined_p = FALSE;
-
-                if (!join_struct.joined_event[i].CreateManualEvent(false))
-                {
-                    return false;
-                }
-            }
-        }
-        join_struct.join_lock = join_struct.n_threads;
-        join_struct.wait_done = false;
-        return true;
-    }
-
-    ulong join(int inputIndex, int threadId, bool* wasHardWait)
-    {
-        ulong totalIterations = 0;
-        *wasHardWait = false;
-        int color = join_struct.lock_color.LoadWithoutBarrier();
-        if (_InterlockedDecrement((long*)&join_struct.join_lock) != 0)
-        {
-            if (color == join_struct.lock_color.LoadWithoutBarrier())
-            {
-            respin:
-#ifdef USE_MWAITX_NOLOOP
-                _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
-                _mm_mwaitx(2, 0, MWAITX_CYCLES);
-                totalIterations += 1;
-                //auto before_waitx = __rdtsc();
-                ////_mm_monitorx((const void*)&totalIterations, 0, 0);
-                //_mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
-                //_mm_mwaitx(2, 0, MWAITX_CYCLES);
-                //auto after_waitx = __rdtsc();
-                //printf("actual: %u, MWAITX_CYCLES: %d\n", (after_waitx - before_waitx), MWAITX_CYCLES);
-#endif
-#ifndef SKIP_SOFT_WAIT
-                int j = 0;
-                for (; j < SPIN_COUNT; j++)
-                {
-#ifdef USE_MWAITX
-                    _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
-#endif // USE_MWAITX
-                    if (color != join_struct.lock_color.LoadWithoutBarrier())
-                    {
-                        PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
-                        break;
-                    }
-#ifdef USE_PAUSE
-                    YieldProcessor();           // indicate to the processor that we are spinning
-#endif // USE_PAUSE
-
-#ifdef USE_MWAITX
-                    _mm_mwaitx(2, 0, MWAITX_CYCLES);
-#endif // USE_MWAITX
-                }
-                totalIterations += j;
-#endif // SKIP_SOFT_WAIT
-
-#ifndef SKIP_HARD_WAIT
-                // we've spun, and if color still hasn't changed, fall into hard wait
-                if (color == join_struct.lock_color.LoadWithoutBarrier())
-                {
-                    PRINT_HARD_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
-                    *wasHardWait = true;
-                    uint32_t dwJoinWait = join_struct.joined_event[color].Wait(INFINITE, FALSE);
-
-                    if (dwJoinWait != WAIT_OBJECT_0)
-                    {
-                        printf("Fatal error");
-                        exit(1);
-                    }
-                }
-#endif // SKIP_HARD_WAIT
-
-                // avoid race due to the thread about to reset the event (occasionally) being preempted before ResetEvent()
-                if (color == join_struct.lock_color.LoadWithoutBarrier())
-                {
-                    goto respin;
-                }
-            }
-        }
-        else
-        {
-            PRINT_RELEASE("%d", threadId, inputIndex);
-            PRINT_RELEASE("---------------\n", threadId);
-            join_struct.joined_p = true;
-            join_struct.joined_event[!color].Reset();
-        }
-        return totalIterations;
-    }
-
-    __forceinline void restart(int threadId, int numberIndex, bool isLastIteration)
-    {
-        //printf("%d. Restart for Thread# %d\n", numberIndex, threadId);
-        join_struct.joined_p = false;
-        join_struct.join_lock = join_struct.n_threads;
-        int color = join_struct.lock_color.LoadWithoutBarrier();
-
-        // Record the start of "wake up time". Do this before changing
-        // the color so we don't have a thread who reaches the place that
-        // measures the "wakeupTimeTicks" before we even record the start
-        // of "restart time".
-        recordRestartStartTime();
-        join_struct.lock_color = !color;
-        join_struct.joined_event[color].Set();
-
-        if (isLastIteration)
-        {
-            waitToComplete.Set();
-        }
-    }
-
-    __forceinline void recordRestartStartTime()
-    {
-        join_struct.restartStartTime = __rdtsc();
-    }
-
-    __forceinline unsigned __int64 getTicksSinceRestart()
-    {
-        assert(join_struct.restartStartTime != 0);
-        return __rdtsc() - join_struct.restartStartTime;
-    }
-
-    bool joined()
-    {
-        return join_struct.joined_p;
-    }
-};
+t_join* joinData = nullptr;
+std::chrono::steady_clock::time_point beginTimer;
+unsigned __int64 start;
 
 class ThreadInput
 {
@@ -287,10 +48,6 @@ public:
         hardWaitCount(0),
         softWaitCount(0) {}
 };
-
-t_join joinData;
-std::chrono::steady_clock::time_point beginTimer;
-unsigned __int64 start;
 
 /// <summary>
 /// Given a number 'input', each thread finds smallest prime number greater than 'n'.
@@ -351,12 +108,12 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         PRINT_ANSWER(" %u %llu= %llu", threadId, processedCount, input, answer);
 
         bool wasHardWait = false;
-        tInput->totalIterations += joinData.join(i, threadId, &wasHardWait);
+        tInput->totalIterations += joinData->join(i, threadId, &wasHardWait);
 
         // The last thread to complete will return here and "restart()".
-        if (joinData.joined())
+        if (joinData->joined())
         {
-            joinData.restart(tInput->threadId, i, tInput->processed == tInput->count);
+            joinData->restart(tInput->threadId, i, tInput->processed == tInput->count);
         }
         else
         {
@@ -366,13 +123,13 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
             if (wasHardWait)
             {
                 tInput->hardWaitCount++;
-                tInput->hardWaitWakeupTimeTicks += joinData.getTicksSinceRestart();
+                tInput->hardWaitWakeupTimeTicks += joinData->getTicksSinceRestart();
 
             }
             else
             {
                 tInput->softWaitCount++;
-                tInput->softWaitWakeupTimeTicks += joinData.getTicksSinceRestart();
+                tInput->softWaitWakeupTimeTicks += joinData->getTicksSinceRestart();
             }
         }
     }
@@ -384,6 +141,8 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
 class PrimeNumbers
 {
 private:
+    int PROCESSOR_COUNT = -1, PROCESSOR_GROUP_COUNT, MWAITX_CYCLES, INPUT_COUNT, COMPLEXITY, JOIN_TYPE;
+
     void DiffWakeTime(ulong hardWaitWakeTime, ulong softWaitWakeTime, ulong* diff, char* diffCh)
     {
         *diffCh = ' ';
@@ -395,41 +154,219 @@ private:
         }
     }
 
+    void parseArgs(int argc, char** argv)
+    {
+#define ARGS(argumentName)                  \
+    int argumentName = 0;                   \
+    bool argumentName##_used = false;
+
+#define VALIDATE_AND_SET(paramName)                                 \
+        if (_strcmpi(parameterName,"--" # paramName) == 0)          \
+        {                                                           \
+            if (paramName##_used)                                   \
+            {                                                       \
+                printf("--" # paramName ## "already specified.\n"); \
+                PrintUsageAndExit();                                \
+            }                                                       \
+            paramName = atoi(parameterValue);                       \
+            paramName##_used = true;                                \
+            continue;                                               \
+        }
+
+        ARGS(input_count);
+        ARGS(complexity);
+        ARGS(thread_count);
+        ARGS(mwaitx_cycle_count);
+        ARGS(join_type);
+
+        if (argc == 1)
+        {
+            PrintUsageAndExit();
+        }
+
+        for (int i = 1; i < argc; i++)
+        {
+            char* parameterName = argv[i++];
+            if ((_strcmpi(parameterName, "-?") == 0) || (_strcmpi(parameterName, "-h") == 0) || (_strcmpi(parameterName, "-help") == 0))
+            {
+                PrintUsageAndExit();
+            }
+
+            if (i == argc)
+            {
+                printf("Missing value for parameter: '%s'\n", parameterName);
+                PrintUsageAndExit();
+            }
+            char* parameterValue = argv[i];
+
+            VALIDATE_AND_SET(input_count);
+            VALIDATE_AND_SET(complexity);
+            VALIDATE_AND_SET(thread_count);
+            VALIDATE_AND_SET(join_type);
+            VALIDATE_AND_SET(mwaitx_cycle_count);
+
+            printf("Unknown parameter: '%s'\n", parameterName);
+            PrintUsageAndExit();
+        }
+
+        complexity %= 32;
+
+        // Verifications
+        if (!input_count_used || !complexity_used)
+        {
+            printf("Missing mandatory arguments.\n");
+            PrintUsageAndExit();
+        }
+        else
+        {
+            INPUT_COUNT = input_count;
+            COMPLEXITY = complexity;
+        }
+
+        if (thread_count_used)
+        {
+            if (thread_count <= 0)
+            {
+                printf("Invalid --thread_count value.\n");
+                PrintUsageAndExit();
+            }
+            else
+            {
+                PROCESSOR_COUNT = thread_count;
+            }
+        }
+
+        if (join_type_used)
+        {
+            if ((join_type < 1) || (join_type > 8))
+            {
+                printf("Invalid value for '--wait_type'\n");
+                PrintUsageAndExit();
+            }
+            else
+            {
+                JOIN_TYPE = join_type;
+            }
+        }
+        else
+        {
+            join_type = 1;
+        }
+
+        if (mwaitx_cycle_count_used)
+        {
+            if ((join_type < 3) || (join_type > 6))
+            {
+                printf("Warning: '--mwaitx_cycle_count' is specified, but value will not be used for 'pause' wait type.\n");
+            }
+            else
+            {
+                MWAITX_CYCLES = mwaitx_cycle_count;
+            }
+        }
+        else
+        {
+            if ((join_type >= 3) || (join_type <= 6))
+            {
+                printf("Warning: '--mwaitx_cycle_count' is needed for one mwaitx wait.\n");
+                PrintUsageAndExit();
+            }
+        }
+
+        PRINT_STATS("Starting..numbers= %d, complexity= %d , JOIN_TYPE= %d.\n", input_count, complexity, JOIN_TYPE);
+    }
+
+    void PrintUsageAndExit()
+    {
+        printf("\nUsage: PrimeNumbers.exe --input_count <numPrimeNumbers> --complexity <complexity> [options]\n");
+        printf("<numPrimeNumbers>: Number of prime numbers per thread.\n");
+        printf("<complexity>: Number between 0~31.\n");
+        printf("Options:\n");
+        printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n");
+        printf("--mwaitx_cycle_count <N>: If specified, the number of cycles to pass in mwaitx().\n");
+        printf("--join_type <N>\n");
+        printf("  1= default \n");
+        printf("  2= pause, only use spin-loop, no hard-wait\n");
+        printf("  3= mwaitx, use inside spin-loop\n");
+        printf("  4= mwaitx, only use inside spin-loop, no hard-wait\n");
+        printf("  5= mwaitx, no spin-loop involved\n");
+        printf("  6= mwaitx, no spin-loop involved, no hard-wait\n");
+        printf("  7= only hard-wait\n");
+        exit(1);
+    }
+
 public:
+
+    PrimeNumbers(int argc, char** argv)
+    {
+        parseArgs(argc, argv);
+
+        if (PROCESSOR_COUNT == -1)
+        {
+            GetProcessorInfo(&PROCESSOR_COUNT, &PROCESSOR_GROUP_COUNT);
+        }
+    }
+
     /// <summary>
     /// Given a number 'n', each thread finds smallest prime number greater than 'n'.
     /// If next prime number is beyond INT_MAX, it will return 0.
     /// 
     /// The test will produce `numPrimeNumbers` random numbers per thread and add in thread's queue.
     /// </summary>
-    /// <param name="numPrimeNumbers"></param>
-    /// <param name="complexity"></param>
+    /// <param name="args"></param>
     /// <returns></returns>
-    bool PrimeNumbersTest(int numPrimeNumbers, int complexity)
+    bool PrimeNumbersTest()
     {
         std::vector<HANDLE> threadHandles(PROCESSOR_COUNT);
         std::vector<DWORD> threadIds(PROCESSOR_COUNT);
         std::vector<ThreadInput*> threadInputs(PROCESSOR_COUNT);
-        joinData.init(PROCESSOR_COUNT);
+
+        switch (JOIN_TYPE)
+        {
+        case 1:
+            joinData = new t_join_pause(PROCESSOR_COUNT);
+            break;
+        case 2:
+            joinData = new t_join_pause_soft_wait_only(PROCESSOR_COUNT);
+            break;
+        case 3:
+            joinData = new t_join_mwaitx_loop(PROCESSOR_COUNT, MWAITX_CYCLES);
+            break;
+        case 4:
+            joinData = new t_join_mwaitx_loop_soft_wait_only(PROCESSOR_COUNT, MWAITX_CYCLES);
+            break;
+        case 5:
+            joinData = new t_join_mwaitx_noloop(PROCESSOR_COUNT, MWAITX_CYCLES);
+            break;
+        case 6:
+            joinData = new t_join_mwaitx_noloop_soft_wait_only(PROCESSOR_COUNT, MWAITX_CYCLES);
+            break;
+        case 7:
+            joinData = new t_join_hard_wait_only(PROCESSOR_COUNT);
+            break;
+        default:
+            printf("");
+            break;
+        }
 
         // Create all the threads
         for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
-            ThreadInput* tInput = new ThreadInput(i, numPrimeNumbers);
+            ThreadInput* tInput = new ThreadInput(i, INPUT_COUNT);
             if (tInput != NULL)
             {
                 float n;
-                tInput->input = (ulong*)malloc((sizeof(ulong) * numPrimeNumbers));
-                for (int i = 0; i < numPrimeNumbers; i++)
+                tInput->input = (ulong*)malloc((sizeof(ulong) * INPUT_COUNT));
+                for (int i = 0; i < INPUT_COUNT; i++)
                 {
-                    if (complexity == 0)
+                    if (COMPLEXITY == 0)
                     {
                         tInput->input[i] = i;
                     }
                     else
                     {
                         n = (float)rand() / RAND_MAX;
-                        tInput->input[i] = (ulong)(n * (100 + pow(2, complexity)));
+                        tInput->input[i] = (ulong)(n * (100 + pow(2, COMPLEXITY)));
                     }
                 }
             }
@@ -458,9 +395,6 @@ public:
         // Hard affinitize the threads to cores.
         SetThreadAffinity(PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT > 1, threadHandles);
 
-        // Create an event to wait for all threads to complete.
-        waitToComplete.CreateManualEvent(false);
-
         // https://stackoverflow.com/a/27739925
         beginTimer = std::chrono::steady_clock::now();
         start = __rdtsc();
@@ -471,15 +405,8 @@ public:
             ResumeThread(threadHandles[i]);
         }
 
-        // Wait till last thread would signal that it is done.
-        uint32_t dwJoinWait = waitToComplete.Wait(INFINITE, FALSE);
-
-        if (dwJoinWait != WAIT_OBJECT_0)
-        {
-            DWORD error = GetLastError();
-            printf("WaitForMultipleObjects() failed with error code %d and return code %d\n", error, dwJoinWait);
-            exit(1);
-        }
+        // Wait till last thread would signal that it is done
+        joinData->waitForThreads();
 
         unsigned __int64 elapsed_ticks = __rdtsc() - start;
         auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - beginTimer).count();
@@ -493,8 +420,8 @@ public:
             char diffCh;
             ulong diff;
             ThreadInput* outputData = threadInputs[i];
-            assert(outputData->hardWaitCount <= numPrimeNumbers);
-            assert(outputData->softWaitCount <= numPrimeNumbers);
+            assert(outputData->hardWaitCount <= INPUT_COUNT);
+            assert(outputData->softWaitCount <= INPUT_COUNT);
             totalHardWaits += outputData->hardWaitCount;
             totalSoftWaits += outputData->softWaitCount;
             totalIterations += outputData->totalIterations;
@@ -506,8 +433,8 @@ public:
         }
 
 
-#define AVG(n) (n / (numPrimeNumbers * PROCESSOR_COUNT)) + 1
-#define AVG_NUMBER(n) (n / numPrimeNumbers) + 1
+#define AVG(n) (n / (INPUT_COUNT * PROCESSOR_COUNT)) + 1
+#define AVG_NUMBER(n) (n / INPUT_COUNT) + 1
 #define AVG_THREAD(n) (n / PROCESSOR_COUNT) + 1
 
         ulong avgDiff, avgNumberDiff, avgThreadDiff;
@@ -535,45 +462,10 @@ public:
     }
 };
 
-void PrintUsageAndExit()
-{
-    printf("\nUsage: PrimeNumbers.exe <numPrimeNumbers> <complexity> [*threadCount*]\n");
-    printf("<numPrimeNumbers>: Number of prime numbers per thread.\n");
-    printf("<complexity>: Number between 0~31.\n");
-    printf("Higher the number, bigger the input numbers will beand thus more probability of threads going into hard - waits.\n");
-    printf("If complexity == 0, it will generate uniform, identical inputs from 0~(<numPrimeNumbers> - 1) for all the threads.\n");
-    printf("[*threadCount*]: Optional number of threads to use. By default it will use number of cores available in all groups.\n");
-    exit(1);
-}
-
 int main(int argc, char** argv)
 {
-    GetProcessorInfo(&PROCESSOR_COUNT, &PROCESSOR_GROUP_COUNT);
-
-    if (argc <= 2)
-    {
-        PrintUsageAndExit();
-    }
-    int numPrimeNumbers = atoi(argv[1]);
-    int complexity = atoi(argv[2]) % 32;
-    if (argc == 4)
-    {
-#ifdef USE_PAUSE
-        PROCESSOR_COUNT = atoi(argv[3]);
-        PRINT_STATS("Starting %d numbers for %d threads", numPrimeNumbers, PROCESSOR_COUNT);
-#elif defined(USE_MWAITX) || defined(USE_MWAITX_NOLOOP)
-        MWAITX_CYCLES = atoi(argv[3]);
-        PRINT_STATS("Starting %d numbers for %d cycles", numPrimeNumbers, MWAITX_CYCLES);
-#endif
-        
-    }
-    else if (argc > 4)
-    {
-        PrintUsageAndExit();
-    }
-    
-    PrimeNumbers p;
-    p.PrimeNumbersTest(numPrimeNumbers, complexity);
+    PrimeNumbers p(argc, argv);
+    p.PrimeNumbersTest();
 
     fflush(stdout);
     return 0;

@@ -1,7 +1,7 @@
+#include <windows.h>
 #include <handleapi.h>
 #include <cassert>
 #include <synchapi.h>
-#include <windows.h>
 
 // WindowsEvent is an implementation of GCEvent that forwards
 // directly to Win32 APIs.

@@ -16,6 +16,17 @@ struct join_structure
     unsigned __int64 restartStartTime;
 };
 
+__forceinline LONGLONG GetCounter()
+{
+    LARGE_INTEGER time;
+    BOOL result = QueryPerformanceCounter(&time);
+    if (result == 0)
+    {
+        printf("QueryPerformanceCounter returned error (%d). GetLastError() = %u\n", result, GetLastError());
+        exit(1);
+    }
+    return time.QuadPart;
+}
 
 class t_join
 {
@@ -163,13 +174,13 @@ public:
 
     __forceinline void recordRestartStartTime()
     {
-        join_struct.restartStartTime = __rdtsc();
+        join_struct.restartStartTime = GetCounter(); // __rdtsc();
     }
 
     __forceinline unsigned __int64 getTicksSinceRestart()
     {
         assert(join_struct.restartStartTime != 0);
-        return __rdtsc() - join_struct.restartStartTime;
+        return /*__rdtsc()*/ GetCounter() - join_struct.restartStartTime;
     }
 
     bool joined()

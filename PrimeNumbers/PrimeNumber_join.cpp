@@ -400,7 +400,7 @@ public:
 
         // https://stackoverflow.com/a/27739925
         beginTimer = std::chrono::steady_clock::now();
-        start = __rdtsc();
+        start = GetCounter();// __rdtsc();
 
         // Start all the threads
         for (int i = 0; i < PROCESSOR_COUNT; i++)
@@ -411,7 +411,7 @@ public:
         // Wait till last thread would signal that it is done
         joinData->waitForThreads();
 
-        unsigned __int64 elapsed_ticks = __rdtsc() - start;
+        unsigned __int64 elapsed_ticks = GetCounter() /*__rdtsc()*/ - start;
         auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - beginTimer).count();
 
         int totalHardWaits = 0, totalSoftWaits = 0;

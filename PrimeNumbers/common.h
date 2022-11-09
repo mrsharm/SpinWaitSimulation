@@ -2,6 +2,7 @@
 #include "EventImpl.h"
 
 #define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
+#define PRINT_THEAD_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
 //#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
 
 #ifdef _DEBUG
@@ -36,6 +37,10 @@
 #ifndef PRINT_STATS
 #define PRINT_STATS(msg, ...)
 #endif // !PRINT_STATS
+
+#ifndef PRINT_THEAD_STATS
+#define PRINT_THEAD_STATS(msg, ...)
+#endif // !PRINT_THEAD_STATS
 
 #ifndef PRINT_ONELINE_STATS
 #define PRINT_ONELINE_STATS(msg, ...)

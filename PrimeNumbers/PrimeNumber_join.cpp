@@ -227,7 +227,7 @@ private:
         {
             if (thread_count <= 0)
             {
-                printf("Invalid --thread_count value.\n");
+                printf("Invalid value '%d' for '--thread_count'. Should be > 1.\n", thread_count);
                 PrintUsageAndExit();
             }
             else
@@ -238,9 +238,9 @@ private:
 
         if (join_type_used)
         {
-            if ((join_type < 1) || (join_type > 8))
+            if ((join_type < 1) || (join_type > 7))
             {
-                printf("Invalid value for '--wait_type'\n");
+                printf("Invalid value '%d' for '--join_type'. Should be between 1 and 7.\n", join_type);
                 PrintUsageAndExit();
             }
             else
@@ -250,7 +250,7 @@ private:
         }
         else
         {
-            join_type = 1;
+            JOIN_TYPE = 1;
         }
 
         if (mwaitx_cycle_count_used)
@@ -266,14 +266,14 @@ private:
         }
         else
         {
-            if ((join_type >= 3) || (join_type <= 6))
+            if ((join_type >= 3) && (join_type <= 6))
             {
-                printf("Warning: '--mwaitx_cycle_count' is needed for one mwaitx wait.\n");
+                printf("Warning: '--mwaitx_cycle_count' is needed when join_type is related to mwaitx.\n");
                 PrintUsageAndExit();
             }
         }
 
-        PRINT_STATS("Starting..numbers= %d, complexity= %d , JOIN_TYPE= %d.\n", input_count, complexity, JOIN_TYPE);
+        PRINT_STATS("Starting..numbers= %d, complexity= %d , JOIN_TYPE= %d", input_count, complexity, JOIN_TYPE);
     }
 
     void PrintUsageAndExit()
@@ -429,7 +429,7 @@ public:
             totalHardWaitWakeupTimeTicks += outputData->hardWaitWakeupTimeTicks;
 
             DiffWakeTime(outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, &diff, &diffCh);
-            PRINT_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, diffCh, diff);
+            PRINT_THEAD_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, diffCh, diff);
         }
 
 

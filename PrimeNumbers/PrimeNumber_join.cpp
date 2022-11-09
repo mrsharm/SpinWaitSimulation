@@ -272,8 +272,6 @@ private:
                 PrintUsageAndExit();
             }
         }
-
-        PRINT_STATS("Starting..numbers= %d, complexity= %d , JOIN_TYPE= %d", input_count, complexity, JOIN_TYPE);
     }
 
     void PrintUsageAndExit()
@@ -281,6 +279,7 @@ private:
         printf("\nUsage: PrimeNumbers.exe --input_count <numPrimeNumbers> --complexity <complexity> [options]\n");
         printf("<numPrimeNumbers>: Number of prime numbers per thread.\n");
         printf("<complexity>: Number between 0~31.\n");
+        printf("\n");
         printf("Options:\n");
         printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n");
         printf("--mwaitx_cycle_count <N>: If specified, the number of cycles to pass in mwaitx().\n");
@@ -301,10 +300,14 @@ public:
     {
         parseArgs(argc, argv);
 
-        if (PROCESSOR_COUNT == -1)
+        int userInput_processor_count = PROCESSOR_COUNT;
+        GetProcessorInfo(&PROCESSOR_COUNT, &PROCESSOR_GROUP_COUNT);
+        if (userInput_processor_count != -1)
         {
-            GetProcessorInfo(&PROCESSOR_COUNT, &PROCESSOR_GROUP_COUNT);
+            PROCESSOR_COUNT = userInput_processor_count;
         }
+
+        PRINT_STATS("Running: numbers= %d, complexity= %d, JOIN_TYPE= %d, threads= %d", INPUT_COUNT, COMPLEXITY, JOIN_TYPE, PROCESSOR_COUNT);
     }
 
     /// <summary>

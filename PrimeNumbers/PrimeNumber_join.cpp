@@ -441,21 +441,21 @@ public:
         }
 
 
-#define AVG(n) (n / (INPUT_COUNT * PROCESSOR_COUNT)) + 1
-#define AVG_NUMBER(n) (n / INPUT_COUNT) + 1
-#define AVG_THREAD(n) (n / PROCESSOR_COUNT) + 1
+#define AVG(n) ((n / (INPUT_COUNT * PROCESSOR_COUNT)) + 1)
+#define AVG_NUMBER(n) ((n / INPUT_COUNT) + 1)
+#define AVG_THREAD(n) ((n / PROCESSOR_COUNT) + 1)
 
-#define AVG_WAKETIME(n, count) (n / count) + 1
+#define AVG_WAKETIME(n, count) ((n / count) + 1)
 
         ulong avgDiff, avgNumberDiff, avgThreadDiff;
         char avgDiffChar, avgNumberDiffChar, avgThreadDiffChar;
 
-        ulong avgHardWaitWakeupTime = AVG_WAKETIME(totalHardWaitWakeupTimeTicks, totalHardWaits);
-        ulong avgSoftWaitWakeupTime = AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, totalSoftWaits);
-        ulong avgHardWaitWakeupTime_Number = AVG_WAKETIME(totalHardWaitWakeupTimeTicks, AVG_NUMBER(totalHardWaits));
-        ulong avgSoftWaitWakeupTime_Number = AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, AVG_NUMBER(totalSoftWaits));
-        ulong avgHardWaitWakeupTime_Thread = AVG_WAKETIME(totalHardWaitWakeupTimeTicks, AVG_THREAD(totalHardWaits));
-        ulong avgSoftWaitWakeupTime_Thread = AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, AVG_THREAD(totalSoftWaits));
+        ulong avgHardWaitWakeupTime = totalHardWaits == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, totalHardWaits);
+        ulong avgSoftWaitWakeupTime = totalSoftWaits == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, totalSoftWaits);
+        ulong avgHardWaitWakeupTime_Number = AVG_NUMBER(totalHardWaits) == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, AVG_NUMBER(totalHardWaits));
+        ulong avgSoftWaitWakeupTime_Number = AVG_NUMBER(totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, AVG_NUMBER(totalSoftWaits));
+        ulong avgHardWaitWakeupTime_Thread = AVG_THREAD(totalHardWaits) == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, AVG_THREAD(totalHardWaits));
+        ulong avgSoftWaitWakeupTime_Thread = AVG_THREAD(totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, AVG_THREAD(totalSoftWaits));
 
         DiffWakeTime(avgHardWaitWakeupTime, avgSoftWaitWakeupTime, &avgDiff, &avgDiffChar);
         DiffWakeTime(avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number, &avgNumberDiff, &avgNumberDiffChar);
@@ -471,9 +471,9 @@ public:
 
         PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu",
             numPrimeNumbers, complexity, PROCESSOR_COUNT,
-            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), AVG(totalHardWaitWakeupTimeTicks), AVG(totalSoftWaitWakeupTimeTicks),
-            AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), AVG_NUMBER(totalHardWaitWakeupTimeTicks), AVG_NUMBER(totalSoftWaitWakeupTimeTicks),
-            AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), AVG_THREAD(totalHardWaitWakeupTimeTicks), AVG_THREAD(totalSoftWaitWakeupTimeTicks),
+            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), avgHardWaitWakeupTime, avgSoftWaitWakeupTime,
+            AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number,
+            AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread,
             elapsed_ticks, elapsed_time);
 
         return true;

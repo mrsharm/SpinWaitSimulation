@@ -17,12 +17,18 @@ ulong t_join_pause::join(int inputIndex, int threadId, bool* wasHardWait)
             {
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
+                    totalIterations += j;
+
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 YieldProcessor();
             }
-            totalIterations += j;
+
+            if (j == SPIN_COUNT)
+            {
+                totalIterations += SPIN_COUNT;
+            }
 
             HARD_WAIT();
         }
@@ -74,12 +80,18 @@ ulong t_join_mwaitx_loop::join(int inputIndex, int threadId, bool* wasHardWait)
                 _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
+                    totalIterations += j;
+
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 _mm_mwaitx(2, 0, mwaitx_cycles);
             }
-            totalIterations += j;
+
+            if (j == SPIN_COUNT)
+            {
+                totalIterations += SPIN_COUNT;
+            }
 
             HARD_WAIT();
         }
@@ -128,12 +140,18 @@ ulong t_join_pause_soft_wait_only::join(int inputIndex, int threadId, bool* wasH
             {
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
+                    totalIterations += j;
+
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 YieldProcessor();           // indicate to the processor that we are spinning
             }
-            totalIterations += j;
+
+            if (j == SPIN_COUNT)
+            {
+                totalIterations += SPIN_COUNT;
+            }
 
             // avoid race due to the thread about to reset the event (occasionally) being preempted before ResetEvent()
             if (color == join_struct.lock_color.LoadWithoutBarrier())
@@ -168,12 +186,18 @@ ulong t_join_mwaitx_loop_soft_wait_only::join(int inputIndex, int threadId, bool
                 _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
+                    totalIterations += j;
+
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 _mm_mwaitx(2, 0, mwaitx_cycles);
             }
-            totalIterations += j;
+
+            if (j == SPIN_COUNT)
+            {
+                totalIterations += SPIN_COUNT;
+            }
 
             // avoid race due to the thread about to reset the event (occasionally) being preempted before ResetEvent()
             if (color == join_struct.lock_color.LoadWithoutBarrier())

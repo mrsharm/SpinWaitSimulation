@@ -2,7 +2,7 @@
 #include "EventImpl.h"
 
 #define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
-#define PRINT_THEAD_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
+//#define PRINT_THEAD_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
 //#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
 
 #ifdef _DEBUG
@@ -10,6 +10,8 @@
 #define PRINT_ANSWER(msg, ...) printf("[ANSWER #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_SOFT_WAIT(msg, ...) printf("[SOFT WAIT #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_HARD_WAIT(msg, ...) printf("[HARD WAIT #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_SOFT_WAIT_LATENCY(msg, ...) printf("[SOFT WAIT LATENCY #%d] " msg ".\n", __VA_ARGS__);
+#define PRINT_HARD_WAIT_LATENCY(msg, ...) printf("[HARD WAIT LATENCY #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_RELEASE(msg, ...) printf("[RELEASE #%d] " msg ".\n", __VA_ARGS__);
 #endif
 
@@ -26,9 +28,17 @@
 #define PRINT_SOFT_WAIT(msg, ...)
 #endif // !PRINT_SOFT_WAIT
 
+#ifndef PRINT_SOFT_WAIT_LATENCY
+#define PRINT_SOFT_WAIT_LATENCY(msg, ...)
+#endif // !PRINT_SOFT_WAIT_LATENCY
+
 #ifndef PRINT_HARD_WAIT
 #define PRINT_HARD_WAIT(msg, ...)
-#endif // !PRINT_SOFT_WAIT
+#endif // !PRINT_HARD_WAIT
+
+#ifndef PRINT_HARD_WAIT_LATENCY
+#define PRINT_HARD_WAIT_LATENCY(msg, ...)
+#endif // !PRINT_HARD_WAIT_LATENCY
 
 #ifndef PRINT_RELEASE
 #define PRINT_RELEASE(msg, ...)

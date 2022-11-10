@@ -11,7 +11,8 @@ ulong t_join_pause::join(int inputIndex, int threadId, bool* wasHardWait)
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-        respin:
+            startSpinLoopTimer();
+respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
             {
@@ -49,7 +50,7 @@ ulong t_join_mwaitx_noloop::join(int inputIndex, int threadId, bool* wasHardWait
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-        respin:
+respin:
             _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
             _mm_mwaitx(2, 0, mwaitx_cycles);
             totalIterations += 1;
@@ -73,7 +74,8 @@ ulong t_join_mwaitx_loop::join(int inputIndex, int threadId, bool* wasHardWait)
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-        respin:
+            startSpinLoopTimer();
+respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
             {
@@ -112,7 +114,7 @@ ulong t_join_hard_wait_only::join(int inputIndex, int threadId, bool* wasHardWai
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-        respin:
+respin:
 
             HARD_WAIT();
         }
@@ -133,8 +135,8 @@ ulong t_join_pause_soft_wait_only::join(int inputIndex, int threadId, bool* wasH
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-        respin:
-
+            startSpinLoopTimer();
+respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
             {
@@ -178,8 +180,8 @@ ulong t_join_mwaitx_loop_soft_wait_only::join(int inputIndex, int threadId, bool
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-        respin:
-
+            startSpinLoopTimer();
+respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
             {
@@ -224,7 +226,7 @@ ulong t_join_mwaitx_noloop_soft_wait_only::join(int inputIndex, int threadId, bo
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-        respin:
+respin:
             _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
             _mm_mwaitx(2, 0, mwaitx_cycles);
 

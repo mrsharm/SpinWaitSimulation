@@ -14,18 +14,22 @@ struct join_structure
     Volatile<bool> joined_p;
     Volatile<int> join_lock;
     unsigned __int64 restartStartTime;
+    unsigned __int64 spinLoopStartTime;
+    unsigned __int64 spinLoopStopTime;
 };
 
 __forceinline LONGLONG GetCounter()
 {
-    LARGE_INTEGER time;
-    BOOL result = QueryPerformanceCounter(&time);
-    if (result == 0)
-    {
-        printf("QueryPerformanceCounter returned error (%d). GetLastError() = %u\n", result, GetLastError());
-        exit(1);
-    }
-    return time.QuadPart;
+    //LARGE_INTEGER time;
+    //BOOL result = QueryPerformanceCounter(&time);
+    //if (result == 0)
+    //{
+    //    printf("QueryPerformanceCounter returned error (%d). GetLastError() = %u\n", result, GetLastError());
+    //    exit(1);
+    //}
+    //return time.QuadPart;
+    unsigned int cpuNum;
+    return __rdtscp(&cpuNum);
 }
 
 class t_join
@@ -174,13 +178,27 @@ public:
 
     __forceinline void recordRestartStartTime()
     {
-        join_struct.restartStartTime = GetCounter(); // __rdtsc();
+        join_struct.restartStartTime = GetCounter();
     }
-
     __forceinline unsigned __int64 getTicksSinceRestart()
     {
         assert(join_struct.restartStartTime != 0);
-        return /*__rdtsc()*/ GetCounter() - join_struct.restartStartTime;
+        return  GetCounter() - join_struct.restartStartTime;
+    }
+
+    __forceinline void startSpinLoopTimer()
+    {
+        join_struct.spinLoopStartTime = GetCounter();
+        join_struct.spinLoopStopTime = 0;
+    }
+    __forceinline void stopSpinLoopTimer()
+    {
+        join_struct.spinLoopStopTime = GetCounter();
+    }
+    __forceinline unsigned __int64 getTicksForSpinLoop()
+    {
+        assert(join_struct.spinLoopStopTime != 0);
+        return join_struct.spinLoopStopTime - join_struct.spinLoopStartTime;
     }
 
     bool joined()
@@ -189,7 +207,9 @@ public:
     }
     
 #define HARD_WAIT()                                                                     \
-            /*we've spun, and if color still hasn't changed, fall into hard wait */     \
+    stopSpinLoopTimer();                                                                \
+                                                                                        \
+    /* we've spun, and if color still hasn't changed, fall into hard wait */            \
     if (color == join_struct.lock_color.LoadWithoutBarrier())                           \
     {                                                                                   \
         PRINT_HARD_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations); \

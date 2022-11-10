@@ -35,6 +35,7 @@ public:
     int hardWaitCount;
     int softWaitCount;
 
+    unsigned __int64 softWaitTimeTicks;
     unsigned __int64 softWaitWakeupTimeTicks;
     unsigned __int64 hardWaitWakeupTimeTicks;
 
@@ -123,18 +124,26 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
             if (wasHardWait)
             {
                 unsigned __int64 hardWaitWakeupLatency = joinData->getTicksSinceRestart();
+
+                // Even though we hard-wait, we also did spin-loop. See how much time was spent in that.
+                unsigned __int64 softWaitCpuCycles = joinData->getTicksForSpinLoop();
+
+                tInput->softWaitTimeTicks += softWaitCpuCycles;
                 tInput->hardWaitWakeupTimeTicks += hardWaitWakeupLatency;
                 tInput->hardWaitCount++;
 
-                PRINT_HARD_WAIT_LATENCY("%d. %lld cycles.", threadId, i, hardWaitWakeupLatency);
+                PRINT_HARD_WAIT_LATENCY("%d. %lld cycles, %llu total spin-loop cycles", threadId, i, hardWaitWakeupLatency, softWaitCpuCycles);
             }
             else
             {
                 unsigned __int64 softWaitWakeupLatency = joinData->getTicksSinceRestart();
+                unsigned __int64 softWaitCpuCycles = joinData->getTicksForSpinLoop();
+
                 tInput->softWaitWakeupTimeTicks += softWaitWakeupLatency;
+                tInput->softWaitTimeTicks += softWaitCpuCycles;
                 tInput->softWaitCount++;
 
-                PRINT_SOFT_WAIT_LATENCY("%d. %lld cycles.", threadId, i, softWaitWakeupLatency);
+                PRINT_SOFT_WAIT_LATENCY("%d. %lld wake-up cycles, %llu total spin-loop cycles.", threadId, i, softWaitWakeupLatency, softWaitCpuCycles);
             }
         }
     }
@@ -312,7 +321,7 @@ public:
             PROCESSOR_COUNT = userInput_processor_count;
         }
 
-        PRINT_STATS("Running: numbers= %d, complexity= %d, JOIN_TYPE= %d, threads= %d", INPUT_COUNT, COMPLEXITY, JOIN_TYPE, PROCESSOR_COUNT);
+        PRINT_STATS("Running: SPIN_COUNT= %d, numbers= %d, complexity= %d, JOIN_TYPE= %d, threads= %d", SPIN_COUNT, INPUT_COUNT, COMPLEXITY, JOIN_TYPE, PROCESSOR_COUNT);
     }
 
     /// <summary>
@@ -423,6 +432,7 @@ public:
         ulong totalIterations = 0;
         unsigned __int64 totalSoftWaitWakeupTimeTicks = 0;
         unsigned __int64 totalHardWaitWakeupTimeTicks = 0;
+        unsigned __int64 totalSpinLoopTime = 0;
         for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
             char diffCh;
@@ -435,9 +445,9 @@ public:
             totalIterations += outputData->totalIterations;
             totalSoftWaitWakeupTimeTicks += outputData->softWaitWakeupTimeTicks;
             totalHardWaitWakeupTimeTicks += outputData->hardWaitWakeupTimeTicks;
-
+            totalSpinLoopTime += outputData->softWaitTimeTicks;
             DiffWakeTime(outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, &diff, &diffCh);
-            PRINT_THEAD_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, diffCh, diff);
+            PRINT_THEAD_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, SpinLoop cycles: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->softWaitTimeTicks, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, diffCh, diff);
         }
 
 
@@ -452,28 +462,31 @@ public:
 
         ulong avgHardWaitWakeupTime = totalHardWaits == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, totalHardWaits);
         ulong avgSoftWaitWakeupTime = totalSoftWaits == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, totalSoftWaits);
+        ulong avgSpinLoopTime = totalSoftWaits == 0 ? 0 : AVG_WAKETIME(totalSpinLoopTime, totalSoftWaits);
         ulong avgHardWaitWakeupTime_Number = AVG_NUMBER(totalHardWaits) == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, AVG_NUMBER(totalHardWaits));
         ulong avgSoftWaitWakeupTime_Number = AVG_NUMBER(totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, AVG_NUMBER(totalSoftWaits));
+        ulong avgSpinLoopTime_Number = AVG_NUMBER(totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSpinLoopTime, AVG_NUMBER(totalSoftWaits));
         ulong avgHardWaitWakeupTime_Thread = AVG_THREAD(totalHardWaits) == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, AVG_THREAD(totalHardWaits));
         ulong avgSoftWaitWakeupTime_Thread = AVG_THREAD(totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, AVG_THREAD(totalSoftWaits));
+        ulong avgSpinLoopTime_Thread = AVG_THREAD(totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSpinLoopTime, AVG_THREAD(totalSoftWaits));
 
         DiffWakeTime(avgHardWaitWakeupTime, avgSoftWaitWakeupTime, &avgDiff, &avgDiffChar);
         DiffWakeTime(avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number, &avgNumberDiff, &avgNumberDiffChar);
         DiffWakeTime(avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread, &avgThreadDiff, &avgThreadDiffChar);
 
         PRINT_STATS("-----------------------------------------------------------");
-        PRINT_STATS("Average wakeup latency: HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", totalHardWaits, totalSoftWaits, avgHardWaitWakeupTime, avgSoftWaitWakeupTime, avgDiffChar, avgDiff);
+        PRINT_STATS("Wait numbers: HardWait: %d, SoftWait: %d, SpinLoopTime: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", totalHardWaits, totalSoftWaits, avgSpinLoopTime, avgHardWaitWakeupTime, avgSoftWaitWakeupTime, avgDiffChar, avgDiff);
         PRINT_STATS("Average per input_number: Iterations: %llu, HardWait: %d, SoftWait: %d", AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits));
-        PRINT_STATS("Average per input_number (all threads): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number, avgNumberDiffChar, avgNumberDiff);
-        PRINT_STATS("Average per thread ran  (all iterations): Iterations: %llu, HardWait: %d, SoftWait: %d, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread, avgThreadDiffChar, avgThreadDiff);
+        PRINT_STATS("Average per input_number (all threads): Iterations: %llu, HardWait: %d, SoftWait: %d, SpinLoopTime: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), avgSpinLoopTime_Number, avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number, avgNumberDiffChar, avgNumberDiff);
+        PRINT_STATS("Average per thread ran  (all iterations): Iterations: %llu, HardWait: %d, SoftWait: %d, SpinLoopTime: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), avgSpinLoopTime_Thread, avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread, avgThreadDiffChar, avgThreadDiff);
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
         PRINT_STATS("Time difference = %lld milliseconds", elapsed_time);
 
-        PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu",
+        PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%llu",
             numPrimeNumbers, complexity, PROCESSOR_COUNT,
-            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), avgHardWaitWakeupTime, avgSoftWaitWakeupTime,
-            AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number,
-            AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread,
+            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), avgSpinLoopTime, avgHardWaitWakeupTime, avgSoftWaitWakeupTime,
+            AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), avgSpinLoopTime_Number, avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number,
+            AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), avgSpinLoopTime_Thread, avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread,
             elapsed_ticks, elapsed_time);
 
         return true;

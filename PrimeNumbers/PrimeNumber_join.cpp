@@ -109,7 +109,10 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         PRINT_ANSWER(" %u %llu= %llu", threadId, processedCount, input, answer);
 
         bool wasHardWait = false;
-        tInput->totalIterations += joinData->join(i, threadId, &wasHardWait);
+        unsigned __int64 spinLoopStopTime = 0;
+        unsigned __int64 spinLoopStartTime = 0;
+
+        tInput->totalIterations += joinData->join(i, threadId, &wasHardWait, &spinLoopStartTime , &spinLoopStopTime);
 
         // The last thread to complete will return here and "restart()".
         if (joinData->joined())
@@ -118,17 +121,15 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         }
         else
         {
+            // Even though we hard-wait, we also did spin-loop. See how much time was spent in that.
+            unsigned __int64 softWaitCpuCycles = spinLoopStopTime - spinLoopStartTime;
+            tInput->softWaitTimeTicks += softWaitCpuCycles;
+
             // Other threads that were waiting so long, will record the latency for
             // wakeup time as soon as things are restarted.
-
             if (wasHardWait)
             {
                 unsigned __int64 hardWaitWakeupLatency = joinData->getTicksSinceRestart();
-
-                // Even though we hard-wait, we also did spin-loop. See how much time was spent in that.
-                unsigned __int64 softWaitCpuCycles = joinData->getTicksForSpinLoop();
-
-                tInput->softWaitTimeTicks += softWaitCpuCycles;
                 tInput->hardWaitWakeupTimeTicks += hardWaitWakeupLatency;
                 tInput->hardWaitCount++;
 
@@ -137,10 +138,8 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
             else
             {
                 unsigned __int64 softWaitWakeupLatency = joinData->getTicksSinceRestart();
-                unsigned __int64 softWaitCpuCycles = joinData->getTicksForSpinLoop();
 
                 tInput->softWaitWakeupTimeTicks += softWaitWakeupLatency;
-                tInput->softWaitTimeTicks += softWaitCpuCycles;
                 tInput->softWaitCount++;
 
                 PRINT_SOFT_WAIT_LATENCY("%d. %lld wake-up cycles, %llu total spin-loop cycles.", threadId, i, softWaitWakeupLatency, softWaitCpuCycles);

@@ -14,8 +14,6 @@ struct join_structure
     Volatile<bool> joined_p;
     Volatile<int> join_lock;
     unsigned __int64 restartStartTime;
-    unsigned __int64 spinLoopStartTime;
-    unsigned __int64 spinLoopStopTime;
 };
 
 __forceinline LONGLONG GetCounter()
@@ -58,6 +56,7 @@ protected:
         }
         join_struct.join_lock = join_struct.n_threads;
         join_struct.wait_done = false;
+        join_struct.restartStartTime = 0;
 
         // Create an event to wait for all threads to complete.
         waitToComplete.CreateManualEvent(false);
@@ -141,7 +140,7 @@ protected:
     }
 
 public:
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait) = 0;
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime) = 0;
 
     void waitForThreads()
     {
@@ -186,28 +185,13 @@ public:
         return  GetCounter() - join_struct.restartStartTime;
     }
 
-    __forceinline void startSpinLoopTimer()
-    {
-        join_struct.spinLoopStartTime = GetCounter();
-        join_struct.spinLoopStopTime = 0;
-    }
-    __forceinline void stopSpinLoopTimer()
-    {
-        join_struct.spinLoopStopTime = GetCounter();
-    }
-    __forceinline unsigned __int64 getTicksForSpinLoop()
-    {
-        assert(join_struct.spinLoopStopTime != 0);
-        return join_struct.spinLoopStopTime - join_struct.spinLoopStartTime;
-    }
-
     bool joined()
     {
         return join_struct.joined_p;
     }
     
 #define HARD_WAIT()                                                                     \
-    stopSpinLoopTimer();                                                                \
+    *spinLoopStopTime = GetCounter();                                                   \
                                                                                         \
     /* we've spun, and if color still hasn't changed, fall into hard wait */            \
     if (color == join_struct.lock_color.LoadWithoutBarrier())                           \
@@ -255,7 +239,7 @@ public:
     /// <param name="threadId">Thread id</param>
     /// <param name="wasHardWait">If there was hardwait needed</param>
     /// <returns>Total spin iterations performed.</returns>
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait);
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };
 
 class t_join_mwaitx_noloop : public t_join
@@ -276,7 +260,7 @@ public:
     /// <param name="threadId">Thread id</param>
     /// <param name="wasHardWait">If there was hardwait needed</param>
     /// <returns>Total spin iterations performed.</returns>
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait);
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };
 
 class t_join_mwaitx_loop : public t_join
@@ -297,7 +281,7 @@ public:
     /// <param name="threadId">Thread id</param>
     /// <param name="wasHardWait">If there was hardwait needed</param>
     /// <returns>Total spin iterations performed.</returns>
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait);
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };
 
 class t_join_hard_wait_only : public t_join
@@ -313,8 +297,11 @@ public:
     /// <param name="inputIndex">index for which join is performed.</param>
     /// <param name="threadId">Thread id</param>
     /// <param name="wasHardWait">If there was hardwait needed</param>
+    /// <param name="spinLoopStopTime">Time tick at which spin loop was completed
+    /// (either because color was changed sooner, or it had to hard-wait, in which case
+    /// it utilized all the spin iterations.</param>
     /// <returns>Total spin iterations performed.</returns>
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait);
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };
 
 class t_join_pause_soft_wait_only : public t_join
@@ -332,7 +319,7 @@ public:
     /// <param name="threadId">Thread id</param>
     /// <param name="wasHardWait">If there was hardwait needed</param>
     /// <returns>Total spin iterations performed.</returns>
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait);
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };
 
 class t_join_mwaitx_loop_soft_wait_only : public t_join
@@ -353,7 +340,7 @@ public:
     /// <param name="threadId">Thread id</param>
     /// <param name="wasHardWait">If there was hardwait needed</param>
     /// <returns>Total spin iterations performed.</returns>
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait);
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };
 
 class t_join_mwaitx_noloop_soft_wait_only : public t_join
@@ -374,5 +361,5 @@ public:
     /// <param name="threadId">Thread id</param>
     /// <param name="wasHardWait">If there was hardwait needed</param>
     /// <returns>Total spin iterations performed.</returns>
-    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait);
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };

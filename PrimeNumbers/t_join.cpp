@@ -2,7 +2,7 @@
 #include "common.h"
 #include "t_join.h"
 
-ulong t_join_pause::join(int inputIndex, int threadId, bool* wasHardWait)
+ulong t_join_pause::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
     *wasHardWait = false;
@@ -11,7 +11,7 @@ ulong t_join_pause::join(int inputIndex, int threadId, bool* wasHardWait)
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-            startSpinLoopTimer();
+            *spinLoopStartTime = GetCounter();
 respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
@@ -41,7 +41,7 @@ respin:
     return totalIterations;
 }
 
-ulong t_join_mwaitx_noloop::join(int inputIndex, int threadId, bool* wasHardWait)
+ulong t_join_mwaitx_noloop::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
     *wasHardWait = false;
@@ -50,6 +50,7 @@ ulong t_join_mwaitx_noloop::join(int inputIndex, int threadId, bool* wasHardWait
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
+            *spinLoopStartTime = GetCounter();
 respin:
             _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
             _mm_mwaitx(2, 0, mwaitx_cycles);
@@ -65,7 +66,7 @@ respin:
     return totalIterations;
 }
 
-ulong t_join_mwaitx_loop::join(int inputIndex, int threadId, bool* wasHardWait)
+ulong t_join_mwaitx_loop::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
     *wasHardWait = false;
@@ -74,7 +75,7 @@ ulong t_join_mwaitx_loop::join(int inputIndex, int threadId, bool* wasHardWait)
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-            startSpinLoopTimer();
+            *spinLoopStartTime = GetCounter();
 respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
@@ -105,7 +106,7 @@ respin:
     return totalIterations;
 }
 
-ulong t_join_hard_wait_only::join(int inputIndex, int threadId, bool* wasHardWait)
+ulong t_join_hard_wait_only::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
     *wasHardWait = false;
@@ -126,7 +127,7 @@ respin:
     return totalIterations;
 }
 
-ulong t_join_pause_soft_wait_only::join(int inputIndex, int threadId, bool* wasHardWait)
+ulong t_join_pause_soft_wait_only::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
     *wasHardWait = false;
@@ -135,7 +136,7 @@ ulong t_join_pause_soft_wait_only::join(int inputIndex, int threadId, bool* wasH
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-            startSpinLoopTimer();
+            *spinLoopStartTime = GetCounter();
 respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
@@ -171,7 +172,7 @@ respin:
     return totalIterations;
 }
 
-ulong t_join_mwaitx_loop_soft_wait_only::join(int inputIndex, int threadId, bool* wasHardWait)
+ulong t_join_mwaitx_loop_soft_wait_only::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
     *wasHardWait = false;
@@ -180,7 +181,7 @@ ulong t_join_mwaitx_loop_soft_wait_only::join(int inputIndex, int threadId, bool
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
-            startSpinLoopTimer();
+            *spinLoopStartTime = GetCounter();
 respin:
             int j = 0;
             for (; j < SPIN_COUNT; j++)
@@ -217,7 +218,7 @@ respin:
     return totalIterations;
 }
 
-ulong t_join_mwaitx_noloop_soft_wait_only::join(int inputIndex, int threadId, bool* wasHardWait)
+ulong t_join_mwaitx_noloop_soft_wait_only::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
     *wasHardWait = false;

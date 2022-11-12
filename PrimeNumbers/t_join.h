@@ -19,6 +19,7 @@ struct join_structure
 __forceinline LONGLONG GetCounter()
 {
     //LARGE_INTEGER time;
+    //BOOL result1 = QueryPerformanceFrequency(&time);
     //BOOL result = QueryPerformanceCounter(&time);
     //if (result == 0)
     //{

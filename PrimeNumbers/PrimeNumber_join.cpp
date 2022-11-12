@@ -50,6 +50,45 @@ public:
         softWaitCount(0) {}
 };
 
+const double _1Q = pow(10, 15);
+const double _1T = pow(10, 12);
+const double _1B = pow(10, 9);
+const double _1M = pow(10, 6);
+const double _1K = pow(10, 3);
+const char* formatNumber(long long input)
+{
+    double scaledInput = input;
+    char scaledUnit = ' ';
+    if (input > _1Q)
+    {
+        scaledInput /= _1Q;
+        scaledUnit = 'Q';
+    }
+    else if (input > _1T)
+    {
+        scaledInput /= _1T;
+        scaledUnit = 'T';
+    }
+    else if (input > _1B)
+    {
+        scaledInput /= _1B;
+        scaledUnit = 'B';
+    }
+    else if (input > _1M)
+    {
+        scaledInput /= _1M;
+        scaledUnit = 'M';
+    }
+    else if (input > _1K)
+    {
+        scaledInput /= _1K;
+        scaledUnit = 'K';
+    }
+    char* buffer = (char*)malloc(sizeof(char) * 100);
+    sprintf_s(buffer, 100, "%4.2f%c", scaledInput, scaledUnit);
+    return buffer;
+}
+
 /// <summary>
 /// Given a number 'input', each thread finds smallest prime number greater than 'n'.
 /// If next prime number is beyond INT_MAX, it will return 0.
@@ -297,13 +336,13 @@ private:
         printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n");
         printf("--mwaitx_cycle_count <N>: If specified, the number of cycles to pass in mwaitx().\n");
         printf("--join_type <N>\n");
-        printf("  1= default \n");
-        printf("  2= pause, only use spin-loop, no hard-wait\n");
-        printf("  3= mwaitx, use inside spin-loop\n");
-        printf("  4= mwaitx, only use inside spin-loop, no hard-wait\n");
-        printf("  5= mwaitx, no spin-loop involved\n");
-        printf("  6= mwaitx, no spin-loop involved, no hard-wait\n");
-        printf("  7= only hard-wait\n");
+        printf("  1= The current GC implementation [t_join_pause]\n");
+        printf("  2= Use 'pause', only use in spin-loop, no hard-wait [t_join_pause_soft_wait_only]\n");
+        printf("  3= Use 'mwaitx', use inside spin-loop [t_join_mwaitx_loop]\n");
+        printf("  4= Use 'mwaitx', only use in spin-loop, no hard-wait [t_join_mwaitx_loop_soft_wait_only]\n");
+        printf("  5= Use 'mwaitx', no spin-loop involved [t_join_mwaitx_noloop]\n");
+        printf("  6= Use 'mwaitx', no spin-loop involved, no hard-wait [t_join_mwaitx_noloop_soft_wait_only]\n");
+        printf("  7= Only hard-wait. [t_join_hard_wait_only]\n");
         exit(1);
     }
 
@@ -456,21 +495,22 @@ public:
 
 #define AVG_WAKETIME(n, count) ((n / count) + 1)
 
-        ulong avgDiff, avgNumberDiff, avgThreadDiff;
-        char avgDiffChar, avgNumberDiffChar, avgThreadDiffChar;
+        ulong avgDiff;
+        char avgDiffChar;
 
         ulong avgHardWaitWakeupTime = totalHardWaits == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, totalHardWaits);
         ulong avgSoftWaitWakeupTime = totalSoftWaits == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, totalSoftWaits);
         // We spin-loop for both, hard-wait and soft-wait. So take both into account.
-        ulong avgSpinLoopTime = (totalHardWaits + totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSpinLoopTime, totalHardWaits + totalSoftWaits);
+        ulong avgSpinLoopTime = (totalHardWaits + totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSpinLoopTime, (totalHardWaits + totalSoftWaits));
 
         DiffWakeTime(avgHardWaitWakeupTime, avgSoftWaitWakeupTime, &avgDiff, &avgDiffChar);
 
-        PRINT_STATS("-----------------------------------------------------------");
-        PRINT_STATS("Latency numbers: HardWait: %d, SoftWait: %d, SpinLoopTime: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", totalHardWaits, totalSoftWaits, avgSpinLoopTime, avgHardWaitWakeupTime, avgSoftWaitWakeupTime, avgDiffChar, avgDiff);
-        PRINT_STATS("Average per input_number: Iterations: %llu, HardWait: %d, SoftWait: %d", AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits));
-        PRINT_STATS("Average per input_number (all threads): Iterations: %llu, HardWait: %d, SoftWait: %d", AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits));
-        PRINT_STATS("Average per thread ran  (all iterations): Iterations: %llu, HardWait: %d, SoftWait: %d", AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits));
+        PRINT_STATS("...........................................................");
+        PRINT_STATS("Latency numbers: HardWait: %s, SoftWait: %s, AvgSpinLoopTimePerWait: %s, TotalSpinWasteTime: %s, HardWaitWakeupTime: %s, SoftWaitWakeupTime: %s, Diff: %c%s", formatNumber(totalHardWaits), formatNumber(totalSoftWaits), formatNumber(avgSpinLoopTime), formatNumber(totalSpinLoopTime), formatNumber(avgHardWaitWakeupTime), formatNumber(avgSoftWaitWakeupTime), avgDiffChar, formatNumber(avgDiff));
+        PRINT_STATS("...........................................................");
+        PRINT_STATS("Average per input_number: Iterations: %s, HardWait: %s, SoftWait: %s", formatNumber(AVG(totalIterations)), formatNumber(AVG(totalHardWaits)), formatNumber(AVG(totalSoftWaits)));
+        PRINT_STATS("Average per input_number (all threads): Iterations: %s, HardWait: %s, SoftWait: %s", formatNumber(AVG_NUMBER(totalIterations)), formatNumber(AVG_NUMBER(totalHardWaits)), formatNumber(AVG_NUMBER(totalSoftWaits)));
+        PRINT_STATS("Average per thread ran  (all iterations): Iterations: %s, HardWait: %s, SoftWait: %s", formatNumber(AVG_THREAD(totalIterations)), formatNumber(AVG_THREAD(totalHardWaits)), formatNumber(AVG_THREAD(totalSoftWaits)));
         PRINT_STATS("Time taken: %llu ticks", elapsed_ticks);
         PRINT_STATS("Time difference = %lld milliseconds", elapsed_time);
 

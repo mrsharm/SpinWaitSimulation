@@ -35,7 +35,8 @@ public:
     int hardWaitCount;
     int softWaitCount;
 
-    unsigned __int64 softWaitTimeTicks;
+    unsigned __int64 spinLoopTimeTicksHardWait;
+    unsigned __int64 spinLoopTimeTicksSoftWait;
     unsigned __int64 softWaitWakeupTimeTicks;
     unsigned __int64 hardWaitWakeupTimeTicks;
 
@@ -161,8 +162,8 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
         else
         {
             // Even though we hard-wait, we also did spin-loop. See how much time was spent in that.
-            unsigned __int64 softWaitCpuCycles = spinLoopStopTime - spinLoopStartTime;
-            tInput->softWaitTimeTicks += softWaitCpuCycles;
+            unsigned __int64 spinWaitCpuCycles = spinLoopStopTime - spinLoopStartTime;
+            
 
             // Other threads that were waiting so long, will record the latency for
             // wakeup time as soon as things are restarted.
@@ -170,18 +171,19 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
             {
                 unsigned __int64 hardWaitWakeupLatency = joinData->getTicksSinceRestart();
                 tInput->hardWaitWakeupTimeTicks += hardWaitWakeupLatency;
+                tInput->spinLoopTimeTicksHardWait += spinWaitCpuCycles;
                 tInput->hardWaitCount++;
 
-                PRINT_HARD_WAIT_LATENCY("%d. %lld cycles, %llu total spin-loop cycles", threadId, i, hardWaitWakeupLatency, softWaitCpuCycles);
+                PRINT_HARD_WAIT_LATENCY("%d. %lld cycles, %llu total spin-loop cycles", threadId, i, hardWaitWakeupLatency, spinWaitCpuCycles);
             }
             else
             {
                 unsigned __int64 softWaitWakeupLatency = joinData->getTicksSinceRestart();
-
                 tInput->softWaitWakeupTimeTicks += softWaitWakeupLatency;
+                tInput->spinLoopTimeTicksSoftWait += spinWaitCpuCycles;
                 tInput->softWaitCount++;
 
-                PRINT_SOFT_WAIT_LATENCY("%d. %lld wake-up cycles, %llu total spin-loop cycles.", threadId, i, softWaitWakeupLatency, softWaitCpuCycles);
+                PRINT_SOFT_WAIT_LATENCY("%d. %lld wake-up cycles, %llu total spin-loop cycles.", threadId, i, softWaitWakeupLatency, spinWaitCpuCycles);
             }
         }
     }
@@ -471,6 +473,8 @@ public:
         unsigned __int64 totalSoftWaitWakeupTimeTicks = 0;
         unsigned __int64 totalHardWaitWakeupTimeTicks = 0;
         unsigned __int64 totalSpinLoopTime = 0;
+        unsigned __int64 totalSpinLoopTimeSoftWait = 0;
+        unsigned __int64 totalSpinLoopTimeHardWait = 0;
         for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
             char diffCh;
@@ -483,10 +487,12 @@ public:
             totalIterations += outputData->totalIterations;
             totalSoftWaitWakeupTimeTicks += outputData->softWaitWakeupTimeTicks;
             totalHardWaitWakeupTimeTicks += outputData->hardWaitWakeupTimeTicks;
-            totalSpinLoopTime += outputData->softWaitTimeTicks;
+            totalSpinLoopTimeSoftWait += outputData->spinLoopTimeTicksSoftWait;
+            totalSpinLoopTimeHardWait += outputData->spinLoopTimeTicksHardWait;
             DiffWakeTime(outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, &diff, &diffCh);
-            PRINT_THEAD_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, SpinLoop cycles: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->softWaitTimeTicks, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, diffCh, diff);
+            PRINT_THEAD_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, SpinLoop cycles: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", i, outputData->totalIterations, outputData->hardWaitCount, outputData->softWaitCount, outputData->spinLoopTimeTicksSoftWait, outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, diffCh, diff);
         }
+        totalSpinLoopTime = totalSpinLoopTimeSoftWait + totalSpinLoopTimeHardWait;
 
 
 #define AVG(n) ((n / (INPUT_COUNT * PROCESSOR_COUNT)) + 1)
@@ -501,12 +507,16 @@ public:
         ulong avgHardWaitWakeupTime = totalHardWaits == 0 ? 0 : AVG_WAKETIME(totalHardWaitWakeupTimeTicks, totalHardWaits);
         ulong avgSoftWaitWakeupTime = totalSoftWaits == 0 ? 0 : AVG_WAKETIME(totalSoftWaitWakeupTimeTicks, totalSoftWaits);
         // We spin-loop for both, hard-wait and soft-wait. So take both into account.
-        ulong avgSpinLoopTime = (totalHardWaits + totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSpinLoopTime, (totalHardWaits + totalSoftWaits));
+        ulong avgSpinLoopTimePerWait = (totalHardWaits + totalSoftWaits) == 0 ? 0 : AVG_WAKETIME(totalSpinLoopTime, (totalHardWaits + totalSoftWaits));
+        ulong avgSpinLoopTimePerSoftWait = (totalSoftWaits == 0) ? 0 : AVG_WAKETIME(totalSpinLoopTimeSoftWait, (totalSoftWaits));
+        ulong avgSpinLoopTimePerHardWait = (totalHardWaits == 0) ? 0 : AVG_WAKETIME(totalSpinLoopTimeHardWait, (totalHardWaits));
 
         DiffWakeTime(avgHardWaitWakeupTime, avgSoftWaitWakeupTime, &avgDiff, &avgDiffChar);
 
         PRINT_STATS("...........................................................");
-        PRINT_STATS("Latency numbers: HardWait: %s, SoftWait: %s, AvgSpinLoopTimePerWait: %s, TotalSpinWasteTime: %s, HardWaitWakeupTime: %s, SoftWaitWakeupTime: %s, Diff: %c%s", formatNumber(totalHardWaits), formatNumber(totalSoftWaits), formatNumber(avgSpinLoopTime), formatNumber(totalSpinLoopTime), formatNumber(avgHardWaitWakeupTime), formatNumber(avgSoftWaitWakeupTime), avgDiffChar, formatNumber(avgDiff));
+        PRINT_STATS("Wait counts: HardWait: %s, SoftWait: %s", formatNumber(totalHardWaits), formatNumber(totalSoftWaits));
+        PRINT_STATS("Spin time: AvgSpinLoopTimePerWait: %s, AvgSpinLoopTimePerSoftWait: %s, AvgSpinLoopTimePerHardWait: %s, TotalSpinWasteTime: %s", formatNumber(avgSpinLoopTimePerWait), formatNumber(avgSpinLoopTimePerSoftWait), formatNumber(avgSpinLoopTimePerHardWait), formatNumber(totalSpinLoopTime));
+        PRINT_STATS("Wake up latency: HardWaitWakeupTime: %s, SoftWaitWakeupTime: %s, Diff: %c%s", formatNumber(avgHardWaitWakeupTime), formatNumber(avgSoftWaitWakeupTime), avgDiffChar, formatNumber(avgDiff));
         PRINT_STATS("...........................................................");
         PRINT_STATS("Average per input_number: Iterations: %s, HardWait: %s, SoftWait: %s", formatNumber(AVG(totalIterations)), formatNumber(AVG(totalHardWaits)), formatNumber(AVG(totalSoftWaits)));
         PRINT_STATS("Average per input_number (all threads): Iterations: %s, HardWait: %s, SoftWait: %s", formatNumber(AVG_NUMBER(totalIterations)), formatNumber(AVG_NUMBER(totalHardWaits)), formatNumber(AVG_NUMBER(totalSoftWaits)));
@@ -516,7 +526,7 @@ public:
 
         PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%llu",
             numPrimeNumbers, complexity, PROCESSOR_COUNT,
-            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), avgSpinLoopTime, avgHardWaitWakeupTime, avgSoftWaitWakeupTime,
+            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), avgSpinLoopTimePerWait, avgHardWaitWakeupTime, avgSoftWaitWakeupTime,
             AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), avgSpinLoopTime_Number, avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number,
             AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), avgSpinLoopTime_Thread, avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread,
             elapsed_ticks, elapsed_time);

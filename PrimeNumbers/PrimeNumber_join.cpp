@@ -56,7 +56,7 @@ const double _1T = pow(10, 12);
 const double _1B = pow(10, 9);
 const double _1M = pow(10, 6);
 const double _1K = pow(10, 3);
-const char* formatNumber(long long input)
+const char* formatNumber(double input)
 {
     double scaledInput = input;
     char scaledUnit = ' ';
@@ -511,12 +511,18 @@ public:
         ulong avgSpinLoopTimePerSoftWait = (totalSoftWaits == 0) ? 0 : AVG_WAKETIME(totalSpinLoopTimeSoftWait, (totalSoftWaits));
         ulong avgSpinLoopTimePerHardWait = (totalHardWaits == 0) ? 0 : AVG_WAKETIME(totalSpinLoopTimeHardWait, (totalHardWaits));
 
+        double totalHardWaitCost = totalHardWaits * (avgSpinLoopTimePerHardWait + avgHardWaitWakeupTime);
+        double totalSoftWaitCost = totalSoftWaits * (avgSpinLoopTimePerSoftWait + avgSoftWaitWakeupTime);
+        double grandCost = totalHardWaitCost + totalSoftWaitCost;
+
         DiffWakeTime(avgHardWaitWakeupTime, avgSoftWaitWakeupTime, &avgDiff, &avgDiffChar);
 
         PRINT_STATS("...........................................................");
-        PRINT_STATS("Wait counts: HardWait: %s, SoftWait: %s", formatNumber(totalHardWaits), formatNumber(totalSoftWaits));
-        PRINT_STATS("Spin time: AvgSpinLoopTimePerWait: %s, AvgSpinLoopTimePerSoftWait: %s, AvgSpinLoopTimePerHardWait: %s, TotalSpinWasteTime: %s", formatNumber(avgSpinLoopTimePerWait), formatNumber(avgSpinLoopTimePerSoftWait), formatNumber(avgSpinLoopTimePerHardWait), formatNumber(totalSpinLoopTime));
-        PRINT_STATS("Wake up latency: HardWaitWakeupTime: %s, SoftWaitWakeupTime: %s, Diff: %c%s", formatNumber(avgHardWaitWakeupTime), formatNumber(avgSoftWaitWakeupTime), avgDiffChar, formatNumber(avgDiff));
+        PRINT_STATS("Total SpinWaste Time        : HardWait: %s, SoftWait: %s, Total: %s", formatNumber(totalSpinLoopTimeHardWait), formatNumber(totalSpinLoopTimeSoftWait), formatNumber(totalSpinLoopTime));
+        PRINT_STATS("Total Wait Counts           : HardWait: %s, SoftWait: %s, Total: %s", formatNumber(totalHardWaits), formatNumber(totalSoftWaits), formatNumber(totalHardWaits + totalSoftWaits));
+        PRINT_STATS("AvgSpinWasteTime (per wait) : HardWait: %s, SoftWait: %s, PerWait: %s, Total: %s", formatNumber(avgSpinLoopTimePerHardWait), formatNumber(avgSpinLoopTimePerSoftWait), formatNumber(avgSpinLoopTimePerWait), formatNumber(totalSpinLoopTime));
+        PRINT_STATS("Avg Wakeup latency          : HardWait: %s, SoftWait: %s, Diff: %c%s", formatNumber(avgHardWaitWakeupTime), formatNumber(avgSoftWaitWakeupTime), avgDiffChar, formatNumber(avgDiff));
+        PRINT_STATS("Cost                        : HardWait: %s, SoftWait: %s, Grand: %s", formatNumber(totalHardWaitCost), formatNumber(totalSoftWaitCost), formatNumber(grandCost));
         PRINT_STATS("...........................................................");
         PRINT_STATS("Average per input_number: Iterations: %s, HardWait: %s, SoftWait: %s", formatNumber(AVG(totalIterations)), formatNumber(AVG(totalHardWaits)), formatNumber(AVG(totalSoftWaits)));
         PRINT_STATS("Average per input_number (all threads): Iterations: %s, HardWait: %s, SoftWait: %s", formatNumber(AVG_NUMBER(totalIterations)), formatNumber(AVG_NUMBER(totalHardWaits)), formatNumber(AVG_NUMBER(totalSoftWaits)));

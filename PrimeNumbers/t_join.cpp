@@ -115,6 +115,7 @@ ulong t_join_hard_wait_only::join(int inputIndex, int threadId, bool* wasHardWai
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
+            *spinLoopStartTime = GetCounter();
 respin:
 
             HARD_WAIT();
@@ -227,6 +228,7 @@ ulong t_join_mwaitx_noloop_soft_wait_only::join(int inputIndex, int threadId, bo
     {
         if (color == join_struct.lock_color.LoadWithoutBarrier())
         {
+            *spinLoopStartTime = GetCounter();
 respin:
             _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
             _mm_mwaitx(2, 0, mwaitx_cycles);

@@ -1,0 +1,1 @@
+HT, AFFINITY, thread_count, input_count,spin_count,mwait_count, complexity,join_type,exec time(ms), num of softwaits, iterations/softwait, cycles in spin/softwait, waitup latency/softwait, num of hardwaits, iterations/hardwait, cycles in spin/hardwait, waitup latency/hardwait

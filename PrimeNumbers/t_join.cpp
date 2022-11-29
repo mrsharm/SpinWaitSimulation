@@ -18,18 +18,126 @@ respin:
             {
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
-                    totalIterations += j;
-
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 YieldProcessor();
             }
 
-            if (j == SPIN_COUNT)
+            totalIterations += j;
+
+            HARD_WAIT();
+        }
+    }
+    else
+    {
+        RESET_HARD_WAIT();
+    }
+    return totalIterations;
+}
+
+ulong t_join_pause2::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
+{
+    ulong totalIterations = 0;
+    *wasHardWait = false;
+    int color = join_struct.lock_color.LoadWithoutBarrier();
+    if (_InterlockedDecrement((long*)&join_struct.join_lock) != 0)
+    {
+        if (color == join_struct.lock_color.LoadWithoutBarrier())
+        {
+            *spinLoopStartTime = GetCounter();
+        respin:
+            int j = 0;
+            for (; j < SPIN_COUNT; j++)
             {
-                totalIterations += SPIN_COUNT;
+                if (color != join_struct.lock_color.LoadWithoutBarrier())
+                {
+                    PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
+                    break;
+                }
+                YieldProcessor();
+                YieldProcessor();
             }
+
+
+            totalIterations += j;
+
+            HARD_WAIT();
+        }
+    }
+    else
+    {
+        RESET_HARD_WAIT();
+    }
+    return totalIterations;
+}
+
+ulong t_join_pause10::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
+{
+    ulong totalIterations = 0;
+    *wasHardWait = false;
+    int color = join_struct.lock_color.LoadWithoutBarrier();
+    if (_InterlockedDecrement((long*)&join_struct.join_lock) != 0)
+    {
+        if (color == join_struct.lock_color.LoadWithoutBarrier())
+        {
+            *spinLoopStartTime = GetCounter();
+        respin:
+            int j = 0;
+            for (; j < SPIN_COUNT; j++)
+            {
+                if (color != join_struct.lock_color.LoadWithoutBarrier())
+                {
+                    PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
+                    break;
+                }
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+                YieldProcessor();
+            }
+
+            totalIterations += j;
+
+            HARD_WAIT();
+        }
+    }
+    else
+    {
+        RESET_HARD_WAIT();
+    }
+    return totalIterations;
+}
+
+
+ulong t_join_no_pause::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
+{
+    ulong totalIterations = 0;
+    *wasHardWait = false;
+    int color = join_struct.lock_color.LoadWithoutBarrier();
+    if (_InterlockedDecrement((long*)&join_struct.join_lock) != 0)
+    {
+        if (color == join_struct.lock_color.LoadWithoutBarrier())
+        {
+            *spinLoopStartTime = GetCounter();
+        respin:
+            int j = 0;
+            for (; j < SPIN_COUNT; j++)
+            {
+                if (color != join_struct.lock_color.LoadWithoutBarrier())
+                {
+                    PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
+                    break;
+                }
+            }
+
+            totalIterations += j;
 
             HARD_WAIT();
         }
@@ -83,18 +191,13 @@ respin:
                 _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
-                    totalIterations += j;
-
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 _mm_mwaitx(2, 0, mwaitx_cycles);
             }
 
-            if (j == SPIN_COUNT)
-            {
-                totalIterations += SPIN_COUNT;
-            }
+            totalIterations += j;
 
             HARD_WAIT();
         }
@@ -108,7 +211,7 @@ respin:
 
 ulong t_join_hard_wait_only::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
-    ulong totalIterations = 0;
+    ulong totalIterations = 1;
     *wasHardWait = false;
     int color = join_struct.lock_color.LoadWithoutBarrier();
     if (_InterlockedDecrement((long*)&join_struct.join_lock) != 0)
@@ -144,24 +247,21 @@ respin:
             {
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
-                    totalIterations += j;
-
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 YieldProcessor();           // indicate to the processor that we are spinning
             }
 
-            if (j == SPIN_COUNT)
-            {
-                totalIterations += SPIN_COUNT;
-            }
+            totalIterations += j;
 
             // avoid race due to the thread about to reset the event (occasionally) being preempted before ResetEvent()
             if (color == join_struct.lock_color.LoadWithoutBarrier())
             {
                 goto respin;
             }
+
+            *spinLoopStopTime = GetCounter();
         }
     }
     else
@@ -190,24 +290,21 @@ respin:
                 _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
                 if (color != join_struct.lock_color.LoadWithoutBarrier())
                 {
-                    totalIterations += j;
-
                     PRINT_SOFT_WAIT("%d. %llu iterations.", threadId, inputIndex, totalIterations);
                     break;
                 }
                 _mm_mwaitx(2, 0, mwaitx_cycles);
             }
 
-            if (j == SPIN_COUNT)
-            {
-                totalIterations += SPIN_COUNT;
-            }
+            totalIterations += j;
 
             // avoid race due to the thread about to reset the event (occasionally) being preempted before ResetEvent()
             if (color == join_struct.lock_color.LoadWithoutBarrier())
             {
                 goto respin;
             }
+
+            *spinLoopStopTime = GetCounter();
         }
     }
     else
@@ -219,6 +316,7 @@ respin:
     return totalIterations;
 }
 
+// This is no different from t_join_mwaitx_loop_soft_wait_only
 ulong t_join_mwaitx_noloop_soft_wait_only::join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime)
 {
     ulong totalIterations = 0;
@@ -232,12 +330,15 @@ ulong t_join_mwaitx_noloop_soft_wait_only::join(int inputIndex, int threadId, bo
 respin:
             _mm_monitorx((const void*)&join_struct.lock_color, 0, 0);
             _mm_mwaitx(2, 0, mwaitx_cycles);
+            totalIterations += 1;
 
             // avoid race due to the thread about to reset the event (occasionally) being preempted before ResetEvent()
             if (color == join_struct.lock_color.LoadWithoutBarrier())
             {
                 goto respin;
             }
+
+            *spinLoopStopTime = GetCounter();
         }
     }
     else

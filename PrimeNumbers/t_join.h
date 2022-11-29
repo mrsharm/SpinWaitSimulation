@@ -221,7 +221,6 @@ public:
     join_struct.joined_p = true;                    \
     join_struct.joined_event[!color].Reset();
 
-
 };
 
 class t_join_pause : public t_join

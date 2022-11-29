@@ -92,32 +92,46 @@ void GetProcessorInfo(int* processorCount, int* processorGroupCount)
 /// <param name="processorCount"></param>
 /// <param name="isMultiCpuGroup"></param>
 /// <param name="threadHandles"></param>
-void SetThreadAffinity(int processorCount, bool isMultiCpuGroup, std::vector<HANDLE>& threadHandles)
+void SetThreadAffinity(int processorCount, 
+					   int numGroups, 
+	                   std::vector<HANDLE>& threadHandles, 
+	                   bool affinitizeEveryOtherProc)
 {
 	assert(threadHandles.size() == processorCount);
 
+	bool isMultiCpuGroup = (numGroups > 1);
+
 	for (int procNo = 0; procNo < processorCount; procNo++)
 	{
-		GroupProcNo groupProcNo(procNo);
+		int adjustedProcNo = (affinitizeEveryOtherProc ? (procNo * 2) : procNo);
+
+		//GroupProcNo groupProcNo(numGroups, adjustedProcNo);
 
 		if (isMultiCpuGroup)
 		{
 			GROUP_AFFINITY ga;
-			ga.Group = (WORD)groupProcNo.GetGroup();
+			//ga.Group = (WORD)groupProcNo.GetGroup();
+			ga.Group = (WORD)(adjustedProcNo >> 6);
 			ga.Reserved[0] = 0; // reserve must be filled with zero
 			ga.Reserved[1] = 0; // otherwise call may fail
 			ga.Reserved[2] = 0;
-			ga.Mask = (size_t)1 << groupProcNo.GetProcIndex();
+			//ga.Mask = (size_t)1 << groupProcNo.GetProcIndex();
+			ga.Mask = (size_t)1 << (adjustedProcNo % 64);
 			BOOL result = SetThreadGroupAffinity(threadHandles[procNo], &ga, nullptr);
 			if (result == 0)
 			{
 				printf("SetThreadGroupAffinity returned 0 for processor %d. GetLastError() = %u\n", procNo, GetLastError());
 				return;
 			}
+			else
+			{
+				printf("affinitizing thread %d with group %d, index %d\n", procNo, ga.Group, (adjustedProcNo % 64));
+			}
 		}
 		else
 		{
-			DWORD_PTR result = SetThreadAffinityMask(threadHandles[procNo], (DWORD_PTR)1 << groupProcNo.GetProcIndex());
+			//DWORD_PTR result = SetThreadAffinityMask(threadHandles[procNo], (DWORD_PTR)1 << groupProcNo.GetProcIndex());
+			DWORD_PTR result = SetThreadAffinityMask(threadHandles[procNo], (DWORD_PTR)1 << adjustedProcNo);
 			if (result == 0)
 			{
 				printf("SetThreadGroupAffinity returned 0 for processor %d. GetLastError() = %u\n", procNo, GetLastError());
@@ -126,6 +140,7 @@ void SetThreadAffinity(int processorCount, bool isMultiCpuGroup, std::vector<HAN
 			else
 			{
 				//printf("affinitizing thread %d with index %d\n", procNo, groupProcNo.GetProcIndex());
+				printf("affinitizing thread %d with index %d\n", procNo, adjustedProcNo);
 			}
 		}
 	}

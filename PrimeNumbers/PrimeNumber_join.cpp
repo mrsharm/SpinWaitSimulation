@@ -107,10 +107,10 @@ const char* formatNumber(double input)
     int num_chars = 0;
     while (char_index < 100)
     {
-        if (input)
+        if (saved_input)
         {
-            buffer[char_index] = (char)(input % base + '0');
-            input /= 10;
+            buffer[char_index] = (char)(saved_input % base + '0');
+            saved_input /= 10;
             num_chars++;
 
             //printf("input is %I64d, num_chars %d, char_index %d->%c\n", input, num_chars, char_index, buffer[char_index]);
@@ -199,7 +199,8 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
     // Make sure things are initialized correctly.
     assert(tInput->hardWaitCount == 0);
     assert(tInput->softWaitCount == 0);
-    assert(tInput->totalIterations == 0);
+    assert(tInput->totalIterationsSoftWaits == 0);
+    assert(tInput->totalIterationsHardWaits == 0);
     int threadId = tInput->threadId;
     int processedCount = 0;
 
@@ -422,7 +423,7 @@ private:
 
         if (ht_used)
         {
-            ht_used_p = (ht_used == 1);
+            ht_used_p = (ht == 1);
         }
 
         if (affi_used)
@@ -440,7 +441,13 @@ private:
         printf("Options:\n");
         printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n");
         printf("--mwaitx_cycle_count <N>: If specified, the number of cycles to pass in mwaitx().\n");
-        printf("--join_type <N>\n");
+        printf("--spin_count <N>: If specified, the number of iterations to spin before going to hardwait. Default= 128000.\n");
+        printf("--ht [0|1]: If hyper threading is ON (1) or OFF (0).\n");
+        printf("--affi <AFF_TYPE>: Affinitization to conduct. <AFF_TYPE> can be:\n");
+        printf("  0= affinity (default)\n");
+        printf("  1= affinity physical core\n");
+        printf("  2= no affinity\n");
+        printf("--join_type <TYPE>: Join algorithm to use. <TYPE> can be:\n");
         printf("  1= The current GC implementation [t_join_pause]\n");
         printf("  2= Use 'pause', only use in spin-loop, no hard-wait [t_join_pause_soft_wait_only]\n");
         printf("  3= Use 'mwaitx', use inside spin-loop [t_join_mwaitx_loop]\n");
@@ -697,10 +704,22 @@ public:
             printf("file could not be opened\n");
             return 1;
         }
-        char res_buf[1024];
+        err = fseek(res_file, 0, SEEK_END);
+        if (err)
+        {
+            printf("file could not be seeked\n");
+            return 1;
+        }
 
-        // 0,  1,        2,            3,           4,          5,          6,         7,        8,             9,                10,                  11,                      12,                      13,               14,                  15,                      16
-        // HT, AFFINITY, thread_count, input_count, spin_count, mwait_count,complexity,join_type,exec time(ms), num of softwaits, iterations/softwait, cycles in spin/softwait, waitup latency/softwait, num of hardwaits, iterations/hardwait, cycles in spin/hardwait, waitup latency/hardwait
+        char res_buf[1024];
+        long pos = ftell(res_file);
+        if (pos == 0)
+        {
+            // Add header if we are creating new file.
+            sprintf_s(res_buf, sizeof(res_buf), "sep=,\nHT, AFFINITY, thread_count, input_count, spin_count, mwait_count,complexity,join_type,exec time(ms), num of softwaits, iterations/softwait, cycles in spin/softwait, waitup latency/softwait, num of hardwaits, iterations/hardwait, cycles in spin/hardwait, waitup latency/hardwait");
+            fputs(res_buf, res_file);
+        }
+
         sprintf_s(res_buf, sizeof(res_buf), "\n%d,%s,%d,%d,%d,%d,%d,%s,%I64d,%d,%I64d,%I64d,%I64d,%d,%I64d,%I64d,%I64d",
             ht_used_p, str_affinity_attribute[affinity_type], PROCESSOR_COUNT, INPUT_COUNT, SPIN_COUNT, MWAITX_CYCLES, COMPLEXITY, str_join_types[JOIN_TYPE], elapsed_time,
             totalSoftWaits, avgIterationsPerSoftWait, avgSpinLoopTimePerSoftWait, avgSoftWaitWakeupTime, 

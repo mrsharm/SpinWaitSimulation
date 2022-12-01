@@ -7,6 +7,7 @@
 
 #ifdef _DEBUG
 //#if 1
+#define PRINT_VERBOSE(msg, ...) printf("[VERBOSE] " msg ".\n", __VA_ARGS__);
 #define PRINT_PROGRESS(msg, ...) printf("[PROGRESS #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_ANSWER(msg, ...) printf("[ANSWER #%d] " msg ".\n", __VA_ARGS__);
 #define PRINT_SOFT_WAIT(msg, ...) printf("[SOFT WAIT #%d] " msg ".\n", __VA_ARGS__);
@@ -16,6 +17,10 @@
 #define PRINT_RELEASE(msg, ...) printf("[RELEASE #%d] " msg ".\n", __VA_ARGS__);
 #endif
 
+
+#ifndef PRINT_VERBOSE
+#define PRINT_VERBOSE(msg, ...)
+#endif // !PRINT_VERBOSE
 
 #ifndef PRINT_PROGRESS
 #define PRINT_PROGRESS(msg, ...)

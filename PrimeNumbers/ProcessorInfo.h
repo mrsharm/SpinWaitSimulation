@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
+#include "common.h"
 
 class GroupProcNo
 {
@@ -120,12 +120,12 @@ void SetThreadAffinity(int processorCount,
 			BOOL result = SetThreadGroupAffinity(threadHandles[procNo], &ga, nullptr);
 			if (result == 0)
 			{
-				printf("SetThreadGroupAffinity returned 0 for processor %d. GetLastError() = %u\n", procNo, GetLastError());
+				PRINT_VERBOSE("SetThreadGroupAffinity returned 0 for processor %d. GetLastError() = %u\n", procNo, GetLastError());
 				return;
 			}
 			else
 			{
-				printf("affinitizing thread %d with group %d, index %d\n", procNo, ga.Group, (adjustedProcNo % 64));
+				PRINT_VERBOSE("affinitizing thread %d with group %d, index %d\n", procNo, ga.Group, (adjustedProcNo % 64));
 			}
 		}
 		else
@@ -134,13 +134,13 @@ void SetThreadAffinity(int processorCount,
 			DWORD_PTR result = SetThreadAffinityMask(threadHandles[procNo], (DWORD_PTR)1 << adjustedProcNo);
 			if (result == 0)
 			{
-				printf("SetThreadGroupAffinity returned 0 for processor %d. GetLastError() = %u\n", procNo, GetLastError());
+				PRINT_VERBOSE("SetThreadGroupAffinity returned 0 for processor %d. GetLastError() = %u\n", procNo, GetLastError());
 				return;
 			}
 			else
 			{
 				//printf("affinitizing thread %d with index %d\n", procNo, groupProcNo.GetProcIndex());
-				printf("affinitizing thread %d with index %d\n", procNo, adjustedProcNo);
+				PRINT_VERBOSE("affinitizing thread %d with index %d\n", procNo, adjustedProcNo);
 			}
 		}
 	}

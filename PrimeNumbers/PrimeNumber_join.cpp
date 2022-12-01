@@ -99,9 +99,8 @@ const double _1T = pow(10, 12);
 const double _1B = pow(10, 9);
 const double _1M = pow(10, 6);
 const double _1K = pow(10, 3);
-const char* formatNumber(double input)
+const char* formatNumber(uint64_t input)
 {
-    int64_t saved_input = (int64_t)input;
     char* buffer = (char*)malloc(sizeof(char) * 100);
     //sprintf_s(buffer, 100, "%4.2f%c", scaledInput, scaledUnit);
 
@@ -110,10 +109,10 @@ const char* formatNumber(double input)
     int num_chars = 0;
     while (char_index < 100)
     {
-        if (saved_input)
+        if (input)
         {
-            buffer[char_index] = (char)(saved_input % base + '0');
-            saved_input /= 10;
+            buffer[char_index] = (char)(input % base + '0');
+            input /= 10;
             num_chars++;
 
             //printf("input is %I64d, num_chars %d, char_index %d->%c\n", input, num_chars, char_index, buffer[char_index]);

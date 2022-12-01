@@ -446,20 +446,20 @@ private:
 
     void PrintUsageAndExit()
     {
-        printf("\nUsage: PrimeNumbers.exe --input_count <numPrimeNumbers> --complexity <complexity> [options]\n");
-        printf("<numPrimeNumbers>: Number of prime numbers per thread.\n");
-        printf("<complexity>: Number between 0~31.\n");
+        printf("\nUsage: PrimeNumbers.exe --input_count <numPrimeNumbers> --complexity <complexity> [options]\n\n");
+        printf("--input_count <N>: Number of prime numbers per thread.\n\n");
+        printf("--complexity <N>: Number between 0~31.\n");
         printf("\n");
         printf("Options:\n");
-        printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n");
-        printf("--thread_priority [0|1]: If 1 (default), create threads with high priority otherwise create them with normal priority.\n");
-        printf("--mwaitx_cycle_count <N>: If specified, the number of cycles to pass in mwaitx().\n");
-        printf("--spin_count <N>: If specified, the number of iterations to spin before going to hardwait. Default= 128000.\n");
-        printf("--ht [0|1]: If hyper threading is ON (1) or OFF (0).\n");
+        printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n\n");
+        printf("--thread_priority [0|1]: If 1 (default), create threads with high priority otherwise create them with normal priority.\n\n");
+        printf("--spin_count <N>: If specified, the number of iterations to spin before going to hardwait. Default= 128000.\n\n");
+        printf("--mwaitx_cycle_count <N>: TIMEOUT value to use in mwaitx(). Required if --join_type is between [3-6].\n\n");
+        printf("--ht [0|1]: If hyper threading is ON (1) or OFF (0).\n\n");
         printf("--affi <AFF_TYPE>: Affinitization to conduct. <AFF_TYPE> can be:\n");
         printf("  0= affinity (default)\n");
         printf("  1= affinity physical core\n");
-        printf("  2= no affinity\n");
+        printf("  2= no affinity\n\n");
         printf("--join_type <TYPE>: Join algorithm to use. <TYPE> can be:\n");
         printf("  1= The current GC implementation [t_join_pause]\n");
         printf("  2= Use 'pause', only use in spin-loop, no hard-wait [t_join_pause_soft_wait_only]\n");

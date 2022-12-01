@@ -1,9 +1,9 @@
 #pragma once
 #include "EventImpl.h"
 
-#define PRINT_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
+//#define PRINT_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
 //#define PRINT_THEAD_STATS(msg, ...) printf(msg ".\n", __VA_ARGS__);
-//#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
+#define PRINT_ONELINE_STATS(msg, ...) printf(msg "\n", __VA_ARGS__);
 
 #ifdef _DEBUG
 //#if 1

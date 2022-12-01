@@ -101,7 +101,7 @@ const double _1M = pow(10, 6);
 const double _1K = pow(10, 3);
 const char* formatNumber(double input)
 {
-    int64_t saved_input = input;
+    int64_t saved_input = (int64_t)input;
     char* buffer = (char*)malloc(sizeof(char) * 100);
     //sprintf_s(buffer, 100, "%4.2f%c", scaledInput, scaledUnit);
 
@@ -603,7 +603,7 @@ public:
             }
         }
 
-        printf("setting affinity for %d threads, %d cpu groups\n", PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT);
+        PRINT_STATS("setting affinity for %d threads, %d cpu groups", PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT);
 
         if (affinity_type != not_affinitized)
         {
@@ -643,7 +643,7 @@ public:
             uint64_t cycles = 0;
             QueryThreadCycleTime(threadHandles[i], &cycles);
 
-            printf("T#%d: umode cpu %5I64dms, kmode cpu %5I64dms, cycles on thread %s, elapsed_time (ms)  %s , elapsed_ticks  %s\n",
+            PRINT_THEAD_STATS("T#%d: umode cpu %5I64dms, kmode cpu %5I64dms, cycles on thread %s, elapsed_time (ms)  %s , elapsed_ticks  %s",
                 i, (umode_cpu_time / 10000), (kmode_cpu_time / 10000), formatNumber(cycles), formatNumber(threadInputs[i]->elapsed_time), formatNumber(threadInputs[i]->elapsed_ticks));
         }
 
@@ -710,24 +710,28 @@ public:
 
         ulong totalSoftWaitIterations = totalIterations - (totalHardWaits * SPIN_COUNT);
 
-        printf("___________________________________________________________________________________________________________\n");
-        printf("%10s | %10s | %10s | %10s | %20s | %30s |\n", "wait type", "total", "per number", "iterations", "spin (cycles/wait)", "wakeup latency (cycles/wait)");
-        printf("___________________________________________________________________________________________________________\n");
-        printf("%10s | %10s | %10.03f | %10s | % 20s | % 30s |\n", "soft", formatNumber(totalSoftWaits), ((double)totalSoftWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), 
+        PRINT_STATS("___________________________________________________________________________________________________________");
+        PRINT_STATS("%10s | %10s | %10s | %10s | %20s | %30s |", "wait type", "total", "per number", "iterations", "spin (cycles/wait)", "wakeup latency (cycles/wait)");
+        PRINT_STATS("___________________________________________________________________________________________________________");
+        PRINT_STATS("%10s | %10s | %10.03f | %10s | % 20s | % 30s |", "soft", formatNumber(totalSoftWaits), ((double)totalSoftWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))),
             formatNumber(avgIterationsPerSoftWait), formatNumber(avgSpinLoopTimePerSoftWait), formatNumber(avgSoftWaitWakeupTime));
-        printf("%10s | %10s | %10.03f | %10s | % 20s | % 30s |\n", "hard", formatNumber(totalHardWaits), ((double)totalHardWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), 
+        PRINT_STATS("%10s | %10s | %10.03f | %10s | % 20s | % 30s |", "hard", formatNumber(totalHardWaits), ((double)totalHardWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))),
             formatNumber(avgIterationsPerHardWait), formatNumber(avgSpinLoopTimePerHardWait), formatNumber(avgHardWaitWakeupTime));
-        printf("___________________________________________________________________________________________________________\n");
-        printf("Elapsed cycles: %s; Elapsed time (ms): %s; Total cycles in spin: %s; Spin cycles / thread: %s; \n", formatNumber(elapsed_ticks), formatNumber(elapsed_time), formatNumber(totalSpinLoopTime), formatNumber(totalSpinLoopTime / PROCESSOR_COUNT));
-        printf("Elapsed cycles: %s; Elapsed time (ms): %s; // Average number per thread", formatNumber(totalElapsedTicks/ PROCESSOR_COUNT), formatNumber(totalElapsedTime / PROCESSOR_COUNT));
+        PRINT_STATS("___________________________________________________________________________________________________________");
+        PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; Total cycles in spin: %s; Spin cycles / thread: %s; ", formatNumber(elapsed_ticks), formatNumber(elapsed_time), formatNumber(totalSpinLoopTime), formatNumber(totalSpinLoopTime / PROCESSOR_COUNT));
+        PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; // Average number per thread", formatNumber(totalElapsedTicks/ PROCESSOR_COUNT), formatNumber(totalElapsedTime / PROCESSOR_COUNT));
 
-        PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%llu",
-            numPrimeNumbers, COMPLEXITY, PROCESSOR_COUNT,
-            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), avgSpinLoopTimePerWait, avgHardWaitWakeupTime, avgSoftWaitWakeupTime,
-            AVG(totalIterations), AVG(totalHardWaits), AVG(totalSoftWaits), avgSpinLoopTimePerWait, avgHardWaitWakeupTime, avgSoftWaitWakeupTime,
-            AVG_NUMBER(totalIterations), AVG_NUMBER(totalHardWaits), AVG_NUMBER(totalSoftWaits), avgSpinLoopTime_Number, avgHardWaitWakeupTime_Number, avgSoftWaitWakeupTime_Number,
-            AVG_THREAD(totalIterations), AVG_THREAD(totalHardWaits), AVG_THREAD(totalSoftWaits), avgSpinLoopTime_Thread, avgHardWaitWakeupTime_Thread, avgSoftWaitWakeupTime_Thread,
-            elapsed_ticks, elapsed_time);
+        PRINT_ONELINE_STATS("OUT] %s|%s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu",
+            //  HT | Affinity | Input_count | complexity | join_type | Spin_count | Thread_Count |
+            (ht_used_p ? "HT" : "no HT"), str_affinity_attribute[affinity_type], INPUT_COUNT, COMPLEXITY, str_join_types[JOIN_TYPE], SPIN_COUNT, PROCESSOR_COUNT,
+            // Soft Wait: Total | Soft Wait: #/input | Soft Wait: Iterations/wait | Soft Wait: Spin time/wait | Soft wait: wakeup latency/wait
+            totalSoftWaits, ((double)totalSoftWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), avgIterationsPerSoftWait, avgSpinLoopTimePerSoftWait, avgSoftWaitWakeupTime,
+            // Hard Wait: Total | Hard Wait: #/input | Hard Wait: Iterations/wait | Hard Wait: Spin time/wait | Hard wait: wakeup latency/wait
+            totalHardWaits, ((double)totalHardWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), avgIterationsPerHardWait, avgSpinLoopTimePerHardWait, avgHardWaitWakeupTime,
+            // Total cycles spinning | Cycles spin per thread
+            totalSpinLoopTime, (totalSpinLoopTime / PROCESSOR_COUNT),
+            // Elapsed time | Elapsed cycles
+            elapsed_time, elapsed_ticks);
 
         FILE* res_file = NULL;
         errno_t err = fopen_s(&res_file, "res.csv", "a");

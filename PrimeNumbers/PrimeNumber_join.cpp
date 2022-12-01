@@ -79,6 +79,9 @@ public:
     unsigned __int64 softWaitWakeupTimeTicks;
     unsigned __int64 hardWaitWakeupTimeTicks;
 
+    int64_t elapsed_time;
+    unsigned __int64 elapsed_ticks;
+
     ThreadInput(int threadId, int numPrimeNumbers) :
         threadId(threadId),
         count(numPrimeNumbers),
@@ -194,6 +197,9 @@ ulong FindNextPrimeNumber(ulong input)
 /// <returns>status</returns>
 DWORD WINAPI ThreadWorker(LPVOID lpParam)
 {
+    auto beginTimer = std::chrono::steady_clock::now();
+    auto start = __rdtsc();
+
     ThreadInput* tInput = (ThreadInput*)lpParam;
 
     // Make sure things are initialized correctly.
@@ -261,6 +267,9 @@ DWORD WINAPI ThreadWorker(LPVOID lpParam)
             }
         }
     }
+
+    tInput->elapsed_ticks = __rdtsc() - start;
+    tInput->elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - beginTimer).count();
 
     PRINT_PROGRESS("*** Total processed: %u out of %u..", threadId, processedCount, tInput->count);
     return 0;
@@ -634,8 +643,8 @@ public:
             uint64_t cycles = 0;
             QueryThreadCycleTime(threadHandles[i], &cycles);
 
-            printf("T#%d: umode cpu %5I64dms, kmode cpu %5I64dms, cycles on thread %s\n",
-                i, (umode_cpu_time / 10000), (kmode_cpu_time / 10000), formatNumber(cycles));
+            printf("T#%d: umode cpu %5I64dms, kmode cpu %5I64dms, cycles on thread %s, elapsed_time (ms)  %s , elapsed_ticks  %s\n",
+                i, (umode_cpu_time / 10000), (kmode_cpu_time / 10000), formatNumber(cycles), formatNumber(threadInputs[i]->elapsed_time), formatNumber(threadInputs[i]->elapsed_ticks));
         }
 
         int totalHardWaits = 0, totalSoftWaits = 0;
@@ -647,6 +656,8 @@ public:
         unsigned __int64 totalSpinLoopTime = 0;
         unsigned __int64 totalSpinLoopTimeSoftWait = 0;
         unsigned __int64 totalSpinLoopTimeHardWait = 0;
+        double totalElapsedTime = 0;
+        double totalElapsedTicks = 0;
         for (int i = 0; i < PROCESSOR_COUNT; i++)
         {
             char diffCh;
@@ -662,6 +673,8 @@ public:
             totalHardWaitWakeupTimeTicks += outputData->hardWaitWakeupTimeTicks;
             totalSpinLoopTimeSoftWait += outputData->spinLoopTimeTicksSoftWait;
             totalSpinLoopTimeHardWait += outputData->spinLoopTimeTicksHardWait;
+            totalElapsedTime += outputData->elapsed_time;
+            totalElapsedTicks += outputData->elapsed_ticks;
             DiffWakeTime(outputData->hardWaitWakeupTimeTicks, outputData->softWaitWakeupTimeTicks, &diff, &diffCh);
             PRINT_THEAD_STATS("[Thread #%d] Iterations: %llu, HardWait: %d, SoftWait: %d, SpinLoop cycles: %llu, HardWaitWakeupTime: %llu, SoftWaitWakeupTime: %llu, Diff: %c%llu", 
                 i, outputData->totalIterations, 
@@ -705,7 +718,8 @@ public:
         printf("%10s | %10s | %10.03f | %10s | % 20s | % 30s |\n", "hard", formatNumber(totalHardWaits), ((double)totalHardWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), 
             formatNumber(avgIterationsPerHardWait), formatNumber(avgSpinLoopTimePerHardWait), formatNumber(avgHardWaitWakeupTime));
         printf("___________________________________________________________________________________________________________\n");
-        printf("Elapsed cycles: %s (total cycles in spin: %I64d(%s), %s/thread), elapsed time (ms): %s\n", formatNumber(elapsed_ticks), totalSpinLoopTime, formatNumber(totalSpinLoopTime), formatNumber(totalSpinLoopTime / PROCESSOR_COUNT), formatNumber(elapsed_time));
+        printf("Elapsed cycles: %s; Elapsed time (ms): %s; Total cycles in spin: %s; Spin cycles / thread: %s; \n", formatNumber(elapsed_ticks), formatNumber(elapsed_time), formatNumber(totalSpinLoopTime), formatNumber(totalSpinLoopTime / PROCESSOR_COUNT));
+        printf("Elapsed cycles: %s; Elapsed time (ms): %s; // Average number per thread", formatNumber(totalElapsedTicks/ PROCESSOR_COUNT), formatNumber(totalElapsedTime / PROCESSOR_COUNT));
 
         PRINT_ONELINE_STATS("OUT] %d|%d|%d|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%d|%d|%llu|%llu|%llu|%llu|%llu",
             numPrimeNumbers, COMPLEXITY, PROCESSOR_COUNT,

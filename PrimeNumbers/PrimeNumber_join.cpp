@@ -275,6 +275,7 @@ private:
     int INPUT_COUNT = -1;
     int COMPLEXITY = -1;
     int JOIN_TYPE = -1;
+    bool setThreadHighPri = true;
 
     void DiffWakeTime(ulong hardWaitWakeTime, ulong softWaitWakeTime, ulong* diff, char* diffCh)
     {
@@ -314,6 +315,7 @@ private:
         ARGS(spin_count);
         ARGS(ht);
         ARGS(affi);
+        ARGS(thread_priority);
 
         if (argc == 1)
         {
@@ -343,6 +345,7 @@ private:
             VALIDATE_AND_SET(spin_count);
             VALIDATE_AND_SET(ht);
             VALIDATE_AND_SET(affi);
+            VALIDATE_AND_SET(thread_priority);
 
             printf("Unknown parameter: '%s'\n", parameterName);
             PrintUsageAndExit();
@@ -430,6 +433,15 @@ private:
         {
             affinity_type = affi;
         }
+
+        if (thread_priority_used)
+        {
+            setThreadHighPri = thread_priority == 1;
+        }
+        else
+        {
+            setThreadHighPri = true;
+        }
     }
 
     void PrintUsageAndExit()
@@ -440,6 +452,7 @@ private:
         printf("\n");
         printf("Options:\n");
         printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n");
+        printf("--thread_priority [0|1]: If 1 (default), create threads with high priority otherwise create them with normal priority.\n");
         printf("--mwaitx_cycle_count <N>: If specified, the number of cycles to pass in mwaitx().\n");
         printf("--spin_count <N>: If specified, the number of iterations to spin before going to hardwait. Default= 128000.\n");
         printf("--ht [0|1]: If hyper threading is ON (1) or OFF (0).\n");
@@ -574,6 +587,11 @@ public:
             wsprintf(buffer, L"Thread# %d", i);
 
             SetThreadDescription(threadHandles[i], buffer);
+
+            if (setThreadHighPri)
+            {
+                SetThreadPriority(threadHandles[i], THREAD_PRIORITY_HIGHEST);
+            }
         }
 
         printf("setting affinity for %d threads, %d cpu groups\n", PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT);

@@ -25,7 +25,7 @@ ULONGLONG g_timeout = 100000;
 uint64_t g_waited_count;
 HANDLE g_hThread;
 // these are measured with OS APIs.
-uint64_t g_umode_cpu_time, g_kmode_cpu_time, g_elapsed_time, g_total_cycles; 
+uint64_t g_umode_cpu_time, g_kmode_cpu_time, g_elapsed_time, g_total_cycles;
 // these are measured on the thread. 
 uint64_t g_total_cycles_on_thread;
 uint64_t g_elapsed_time_us_on_thread;
@@ -212,6 +212,32 @@ DWORD WINAPI ThreadFunction_mwaitx(LPVOID lpParam)
     return 0;
 }
 
+DWORD WINAPI ThreadFunction_monitorx(LPVOID lpParam)
+{
+    size_t original_value = g_aligned_global_location.loc;
+    size_t waited_count = 0;
+    printf("original value is %Id, timeout is %I64d\n", original_value, g_timeout);
+    uint64_t start_cycles = __rdtsc();
+    auto time_start = std::chrono::steady_clock::now();
+
+    while (g_aligned_global_location.loc == original_value)
+    {
+        _mm_monitorx((const void*)&g_aligned_global_location.loc, 0, 0);
+
+        if (g_aligned_global_location.loc == original_value) {
+            waited_count++;
+        }
+    }
+
+    g_total_cycles_on_thread = __rdtsc() - start_cycles;
+    g_elapsed_time_us_on_thread = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - time_start).count();
+
+    printf("[%10s] changed to %Id and waited %s times!\n", "monitorx", g_aligned_global_location.loc, formatNumber(waited_count));
+
+    g_waited_count = waited_count;
+    return 0;
+}
+
 DWORD WINAPI ThreadFunction_mwaitx2(LPVOID lpParam)
 {
     size_t original_value = g_aligned_global_location.loc;
@@ -329,7 +355,8 @@ const char* str_wait_type[] =
     "tpause",
     "umwait",
     "mwaitx",
-    "mwaitx2"
+    "mwaitx2",
+    "monitorx"
 };
 
 int main(int argc, char** argv)
@@ -398,6 +425,10 @@ int main(int argc, char** argv)
 
     case 4:
         proc = ThreadFunction_mwaitx2;
+        break;
+
+    case 5:
+        proc = ThreadFunction_monitorx;
         break;
 
     default:

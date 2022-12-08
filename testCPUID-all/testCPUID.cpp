@@ -340,6 +340,10 @@ void experiment(LPTHREAD_START_ROUTINE proc)
         printf("thread %d created\n", tid);
     }
 
+    SetThreadPriority(g_hThread, THREAD_PRIORITY_HIGHEST);
+    SetThreadAffinity(g_hThread, 45);
+    SetThreadAffinity(GetCurrentThread(), 92);
+
     ResumeThread(g_hThread);
 
     // sleep for 10s
@@ -347,6 +351,24 @@ void experiment(LPTHREAD_START_ROUTINE proc)
     g_aligned_global_location.loc = 5;
 
     printf("end...\n");
+}
+
+void SetThreadAffinity(HANDLE tHandle, int procNum)
+{
+    GROUP_AFFINITY ga;
+    //ga.Group = (WORD)groupProcNo.GetGroup();
+    ga.Group = (WORD)(procNum >> 6);
+    ga.Reserved[0] = 0; // reserve must be filled with zero
+    ga.Reserved[1] = 0; // otherwise call may fail
+    ga.Reserved[2] = 0;
+    //ga.Mask = (size_t)1 << groupProcNo.GetProcIndex();
+    ga.Mask = (size_t)1 << (procNum % 64);
+    BOOL result = SetThreadGroupAffinity(tHandle, &ga, nullptr);
+    if (result == 0)
+    {
+        printf("SetThreadGroupAffinity returned 0 for processor 4. GetLastError() = %u\n", GetLastError());
+        return;
+    }
 }
 
 const char* str_wait_type[] =

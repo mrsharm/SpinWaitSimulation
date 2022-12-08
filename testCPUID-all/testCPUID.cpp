@@ -9,6 +9,8 @@
 
 
 int g_proc_index = 0;
+int g_worker_core = -1;
+int g_mainthread_core = -1;
 
 const unsigned HS_CACHE_LINE_SIZE = 128;
 
@@ -314,8 +316,34 @@ void parse_cmd_args(int argc, char** argv)
         {
             g_proc_index = atoi(argv[++arg_index]);
         }
+        else if (!strcmp(argv[arg_index], "-worker-core"))
+        {
+            g_worker_core = atoi(argv[++arg_index]);
+        }
+        else if (!strcmp(argv[arg_index], "-main-core"))
+        {
+            g_mainthread_core = atoi(argv[++arg_index]);
+        }
 
         ++arg_index;
+    }
+}
+
+void SetThreadAffinity(HANDLE tHandle, int procNum)
+{
+    GROUP_AFFINITY ga;
+    //ga.Group = (WORD)groupProcNo.GetGroup();
+    ga.Group = (WORD)(procNum >> 6);
+    ga.Reserved[0] = 0; // reserve must be filled with zero
+    ga.Reserved[1] = 0; // otherwise call may fail
+    ga.Reserved[2] = 0;
+    //ga.Mask = (size_t)1 << groupProcNo.GetProcIndex();
+    ga.Mask = (size_t)1 << (procNum % 64);
+    BOOL result = SetThreadGroupAffinity(tHandle, &ga, nullptr);
+    if (result == 0)
+    {
+        printf("SetThreadGroupAffinity returned 0 for processor 4. GetLastError() = %u\n", GetLastError());
+        return;
     }
 }
 
@@ -341,8 +369,16 @@ void experiment(LPTHREAD_START_ROUTINE proc)
     }
 
     SetThreadPriority(g_hThread, THREAD_PRIORITY_HIGHEST);
-    SetThreadAffinity(g_hThread, 45);
-    SetThreadAffinity(GetCurrentThread(), 92);
+
+    if (g_worker_core >= 0)
+    {
+        SetThreadAffinity(g_hThread, g_worker_core);
+    }
+
+    if (g_mainthread_core >= 0)
+    {
+        SetThreadAffinity(GetCurrentThread(), g_mainthread_core);
+    }
 
     ResumeThread(g_hThread);
 
@@ -351,24 +387,6 @@ void experiment(LPTHREAD_START_ROUTINE proc)
     g_aligned_global_location.loc = 5;
 
     printf("end...\n");
-}
-
-void SetThreadAffinity(HANDLE tHandle, int procNum)
-{
-    GROUP_AFFINITY ga;
-    //ga.Group = (WORD)groupProcNo.GetGroup();
-    ga.Group = (WORD)(procNum >> 6);
-    ga.Reserved[0] = 0; // reserve must be filled with zero
-    ga.Reserved[1] = 0; // otherwise call may fail
-    ga.Reserved[2] = 0;
-    //ga.Mask = (size_t)1 << groupProcNo.GetProcIndex();
-    ga.Mask = (size_t)1 << (procNum % 64);
-    BOOL result = SetThreadGroupAffinity(tHandle, &ga, nullptr);
-    if (result == 0)
-    {
-        printf("SetThreadGroupAffinity returned 0 for processor 4. GetLastError() = %u\n", GetLastError());
-        return;
-    }
 }
 
 const char* str_wait_type[] =

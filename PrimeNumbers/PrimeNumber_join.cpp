@@ -761,11 +761,6 @@ public:
     }
 };
 
-void printInfo()
-{
-
-}
-
 int main(int argc, char** argv)
 {
     PrimeNumbers p(argc, argv);

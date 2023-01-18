@@ -86,12 +86,93 @@ void GetProcessorInfo(int* processorCount, int* processorGroupCount)
 	}
 }
 
+// Helper function to count set bits in the processor mask.
+DWORD CountSetBits(ULONG_PTR bitMask)
+{
+	DWORD LSHIFT = sizeof(ULONG_PTR) * 8 - 1;
+	DWORD bitSetCount = 0;
+	ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
+	DWORD i;
+
+	for (i = 0; i <= LSHIFT; ++i)
+	{
+		bitSetCount += ((bitMask & bitTest) ? 1 : 0);
+		bitTest /= 2;
+	}
+
+	return bitSetCount;
+}
+
 /// <summary>
-/// Hard affinitize the threads to the processors.
+/// Credit: https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getlogicalprocessorinformation
+/// </summary>
+/// <returns></returns>
+bool IsHyperThreadingEnabled()
+{
+	PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer = NULL;
+	PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = NULL;
+	DWORD cbBuffer;
+
+	cbBuffer = 0;
+	BOOL done = FALSE;
+
+	while (!done)
+	{
+		BOOL ret = GetLogicalProcessorInformation(buffer, &cbBuffer);
+		if (ret == FALSE)
+		{
+			DWORD lastError = GetLastError();
+			if (lastError == ERROR_INSUFFICIENT_BUFFER)
+			{
+				if (buffer)
+				{
+					free(buffer);
+				}
+
+				buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(cbBuffer);
+
+				if (NULL == buffer)
+				{
+					printf("\nError: Allocation failure\n");
+					return false;
+				}
+			}
+			else
+			{
+				printf("\nError %d\n", lastError);
+				return false;
+			}
+		}
+		else
+		{
+			done = TRUE;
+		}
+	}
+
+	ptr = buffer;
+	DWORD byteOffset = 0;
+	int processorCoreCount = 0, logicalProcessorCount = 0;
+	while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= cbBuffer)
+	{
+		if (ptr->Relationship == RelationProcessorCore)
+		{
+			processorCoreCount++;
+			logicalProcessorCount += CountSetBits(ptr->ProcessorMask);
+		}
+		byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+		ptr++;
+	}
+	return (processorCoreCount != logicalProcessorCount);
+}
+
+/// <summary>
+/// Hard affinitize the threads to the processors. If hyper threading is ON, it
+/// will affinitize every other core.
 /// </summary>
 /// <param name="processorCount"></param>
 /// <param name="isMultiCpuGroup"></param>
 /// <param name="threadHandles"></param>
+/// <param name="affinitizeEveryOtherProc"></param>
 void SetThreadAffinity(int processorCount, 
 					   int numGroups, 
 	                   std::vector<HANDLE>& threadHandles, 

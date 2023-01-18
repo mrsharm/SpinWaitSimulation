@@ -31,6 +31,25 @@ int SPIN_COUNT;
 
 bool HYPERTHREADING_ENABLED = false;
 
+enum affinity_attribute
+{
+    // default, how Server GC threads are today
+    hard_affinitized = 0,
+    // in the HT case, affinitize to every other logical core which belongs to a different physical core.
+    hard_affinitized_physical = 1,
+    not_affinitized = 2
+};
+
+const char* str_affinity_attribute[] =
+{
+    "affinity",
+    "affinity physical core",
+    "no affinity"
+};
+
+// this is via the "--affi" arg, default is 0
+int affinity_type = 0;
+
 t_join* joinData = nullptr;
 std::chrono::steady_clock::time_point beginTimer;
 unsigned __int64 start;
@@ -301,7 +320,6 @@ private:
         ARGS(mwaitx_cycle_count);
         ARGS(join_type);
         ARGS(spin_count);
-        ARGS(ht);
         ARGS(affi);
         ARGS(thread_priority);
 
@@ -410,6 +428,16 @@ private:
             SPIN_COUNT = 128 * 1000;
         }
 
+        if (affi_used)
+        {
+            if (!HYPERTHREADING_ENABLED && (affinity_type == hard_affinitized_physical))
+            {
+                printf("Invalid value '%d' for '--affi'. Cannot set 'affinity physical core' on machine with hyper threading disabled.\n", affinity_type);
+                PrintUsageAndExit();
+            }
+            affinity_type = affi;
+        }
+
         if (thread_priority_used)
         {
             setThreadHighPri = thread_priority == 1;
@@ -431,6 +459,10 @@ private:
         printf("--thread_priority [0|1]: If 1 (default), create threads with high priority otherwise create them with normal priority.\n\n");
         printf("--spin_count <N>: If specified, the number of iterations to spin before going to hardwait. Default= 128000.\n\n");
         printf("--mwaitx_cycle_count <N>: TIMEOUT value to use in mwaitx(). Required if --join_type is between [3-6].\n\n");
+        printf("--affi <AFF_TYPE>: Affinitization to conduct. <AFF_TYPE> can be:\n");
+        printf("  0= affinity (default)\n");
+        printf("  1= affinity physical core\n");
+        printf("  2= no affinity\n\n");
         printf("--join_type <TYPE>: Join algorithm to use. <TYPE> can be:\n");
         printf("  1= The current GC implementation [t_join_pause]\n");
         printf("  2= Use 'pause', only use in spin-loop, no hard-wait [t_join_pause_soft_wait_only]\n");
@@ -449,6 +481,8 @@ public:
 
     PrimeNumbers(int argc, char** argv)
     {
+        HYPERTHREADING_ENABLED = IsHyperThreadingEnabled();
+
         parseArgs(argc, argv);
 
         int userInput_processor_count = PROCESSOR_COUNT;
@@ -457,11 +491,10 @@ public:
         {
             PROCESSOR_COUNT = userInput_processor_count;
         }
-        HYPERTHREADING_ENABLED = IsHyperThreadingEnabled();
-
-        PRINT_STATS("Running: SPIN_COUNT= %d, numbers= %d, complexity= %d, JOIN_TYPE= %s, threads= %d, %s, mwait cycles %s",
+        
+        PRINT_STATS("Running: SPIN_COUNT= %d, numbers= %d, complexity= %d, JOIN_TYPE= %s, threads= %d, %s %s, mwait cycles %s",
             SPIN_COUNT, INPUT_COUNT, COMPLEXITY, str_join_types[JOIN_TYPE], PROCESSOR_COUNT,
-            (HYPERTHREADING_ENABLED ? "HT" : "no HT"), formatNumber(MWAITX_CYCLES));
+            (HYPERTHREADING_ENABLED ? "HT" : "no HT"), str_affinity_attribute[affinity_type], formatNumber(MWAITX_CYCLES));
     }
 
     /// <summary>
@@ -567,8 +600,11 @@ public:
 
         PRINT_STATS("setting affinity for %d threads, %d cpu groups", PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT);
 
-        // Hard affinitize the threads to cores.
-        SetThreadAffinity(PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT, threadHandles, HYPERTHREADING_ENABLED);
+        if (affinity_type != not_affinitized)
+        {
+            // Hard affinitize the threads to cores.
+            SetThreadAffinity(PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT, threadHandles, HYPERTHREADING_ENABLED);
+        }
 
         // https://stackoverflow.com/a/27739925
         beginTimer = std::chrono::steady_clock::now();
@@ -680,9 +716,9 @@ public:
         PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; Total cycles in spin: %s; Spin cycles / thread: %s; ", formatNumber(elapsed_ticks), formatNumber(elapsed_time), formatNumber(totalSpinLoopTime), formatNumber(totalSpinLoopTime / PROCESSOR_COUNT));
         PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; // Average number per thread", formatNumber(totalElapsedTicks/ PROCESSOR_COUNT), formatNumber(totalElapsedTime / PROCESSOR_COUNT));
 
-        PRINT_ONELINE_STATS("OUT] %s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu",
-            //  HT | Input_count | complexity | join_type | Spin_count | Thread_Count |
-            (HYPERTHREADING_ENABLED ? "HT" : "no HT"), INPUT_COUNT, COMPLEXITY, str_join_types[JOIN_TYPE], SPIN_COUNT, PROCESSOR_COUNT,
+        PRINT_ONELINE_STATS("OUT] %s|%s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu",
+            //  HT | Affinity | Input_count | complexity | join_type | Spin_count | Thread_Count |
+            (HYPERTHREADING_ENABLED ? "HT" : "no HT"), str_affinity_attribute[affinity_type], INPUT_COUNT, COMPLEXITY, str_join_types[JOIN_TYPE], SPIN_COUNT, PROCESSOR_COUNT,
             // Soft Wait: Total | Soft Wait: #/input | Soft Wait: Iterations/wait | Soft Wait: Spin time/wait | Soft wait: wakeup latency/wait
             totalSoftWaits, ((double)totalSoftWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), avgIterationsPerSoftWait, avgSpinLoopTimePerSoftWait, avgSoftWaitWakeupTime,
             // Hard Wait: Total | Hard Wait: #/input | Hard Wait: Iterations/wait | Hard Wait: Spin time/wait | Hard wait: wakeup latency/wait
@@ -715,8 +751,8 @@ public:
             fputs(res_buf, res_file);
         }
 
-        sprintf_s(res_buf, sizeof(res_buf), "\n%d,%d,%d,%d,%d,%d,%s,%I64d,%d,%I64d,%I64d,%I64d,%d,%I64d,%I64d,%I64d",
-            HYPERTHREADING_ENABLED, PROCESSOR_COUNT, INPUT_COUNT, SPIN_COUNT, MWAITX_CYCLES, COMPLEXITY, str_join_types[JOIN_TYPE], elapsed_time,
+        sprintf_s(res_buf, sizeof(res_buf), "\n%d,%s,%d,%d,%d,%d,%d,%s,%I64d,%d,%I64d,%I64d,%I64d,%d,%I64d,%I64d,%I64d",
+            HYPERTHREADING_ENABLED, str_affinity_attribute[affinity_type], PROCESSOR_COUNT, INPUT_COUNT, SPIN_COUNT, MWAITX_CYCLES, COMPLEXITY, str_join_types[JOIN_TYPE], elapsed_time,
             totalSoftWaits, avgIterationsPerSoftWait, avgSpinLoopTimePerSoftWait, avgSoftWaitWakeupTime, 
             totalHardWaits, avgIterationsPerHardWait, avgSpinLoopTimePerHardWait, avgHardWaitWakeupTime);
         fputs(res_buf, res_file);

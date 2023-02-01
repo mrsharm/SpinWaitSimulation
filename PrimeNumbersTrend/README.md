@@ -6,10 +6,6 @@ Run the PrimeNumbers.exe repeatedly for various inputs/complexity and dumps the 
 
 ```
 Usage: PrimeNumbersTrend.exe <Path> <maxInputSize> <maxComplexity> <maxThreads>?
-<Path>: Full path to PrimeNumbers.exe
-<maxInputSize>: Max Input size.
-<maxComplexity>: Max Complexity.
-<maxThreads>: Optional max threads. By default, it will just run with threads equal to number of logical processors.
 ```
 
 ### Update PrimeNumbers

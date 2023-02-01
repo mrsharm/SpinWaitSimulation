@@ -720,7 +720,7 @@ public:
         PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; Total cycles in spin: %s; Spin cycles / thread: %s; ", formatNumber(elapsed_ticks), formatNumber(elapsed_time), formatNumber(totalSpinLoopTime), formatNumber(totalSpinLoopTime / PROCESSOR_COUNT));
         PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; // Average number per thread", formatNumber(totalElapsedTicks/ PROCESSOR_COUNT), formatNumber(totalElapsedTime / PROCESSOR_COUNT));
 
-        PRINT_ONELINE_STATS("OUT] %s|%s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu",
+        PRINT_ONELINE_STATS("OUT] %s|%s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu|%llu",
             //  HT | Affinity | Input_count | complexity | join_type | Spin_count | Thread_Count |
             (ht_used_p ? "HT" : "no HT"), str_affinity_attribute[affinity_type], INPUT_COUNT, COMPLEXITY, str_join_types[JOIN_TYPE], SPIN_COUNT, PROCESSOR_COUNT,
             // Soft Wait: Total | Soft Wait: #/input | Soft Wait: Iterations/wait | Soft Wait: Spin time/wait | Soft wait: wakeup latency/wait
@@ -729,8 +729,8 @@ public:
             totalHardWaits, ((double)totalHardWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), avgIterationsPerHardWait, avgSpinLoopTimePerHardWait, avgHardWaitWakeupTime,
             // Total cycles spinning | Cycles spin per thread
             totalSpinLoopTime, (totalSpinLoopTime / PROCESSOR_COUNT),
-            // Elapsed time | Elapsed cycles
-            elapsed_time, elapsed_ticks);
+            // Elapsed time | Elapsed cycles | MWaitXCycles
+            elapsed_time, elapsed_ticks, formatNumber(MWAITX_CYCLES));
 
         FILE* res_file = NULL;
         errno_t err = fopen_s(&res_file, "res.csv", "a");

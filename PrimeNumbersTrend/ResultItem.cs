@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -30,6 +29,7 @@ namespace DataModel
             CyclesSpinPerThread = Convert.ToDouble(parsedOutput[17]);
             ElapsedTime = Convert.ToDouble(parsedOutput[18]);
             ElapsedCycles = Convert.ToDouble(parsedOutput[19]);
+            MWaitXCycles = Convert.ToDouble(parsedOutput[20]);
         }
 
         private ResultItem() { }
@@ -54,11 +54,12 @@ namespace DataModel
         public double CyclesSpinPerThread { get; set; }
         public double ElapsedTime { get; set; }
         public double ElapsedCycles { get; set; }
+        public double MWaitXCycles { get; set; }
 
         public string ToMarkDownRow()
-            => $"{HT}|{Affinity}|{InputCount}|{Complexity}|{JoinType}|{SpinCount}|{ThreadCount}|{SoftWaitTotal}|{SoftWaitNumPerInput}|{SoftWaitIterationsPerWait}|{SoftWaitSpinTimePerWait}|{SoftWaitWakeupLatencyPerWait}|{HardWaitTotal}|{HardWaitNumPerInput}|{HardWaitIterationsPerWait}|{HardWaitSpinTimePerWait}|{HardWaitWakeupLatencyPerWait}|{CyclesSpinPerThread}|{ElapsedTime}|{ElapsedCycles}";
+            => $"{HT}|{Affinity}|{InputCount}|{Complexity}|{JoinType}|{SpinCount}|{ThreadCount}|{SoftWaitTotal}|{SoftWaitNumPerInput}|{SoftWaitIterationsPerWait}|{SoftWaitSpinTimePerWait}|{SoftWaitWakeupLatencyPerWait}|{HardWaitTotal}|{HardWaitNumPerInput}|{HardWaitIterationsPerWait}|{HardWaitSpinTimePerWait}|{HardWaitWakeupLatencyPerWait}|{CyclesSpinPerThread}|{ElapsedTime}|{ElapsedCycles}|{MWaitXCycles}";
         public string ToCSVRow()
-            => $"{HT},{Affinity},{InputCount},{Complexity},{JoinType},{SpinCount},{ThreadCount},{SoftWaitTotal},{SoftWaitNumPerInput},{SoftWaitIterationsPerWait},{SoftWaitSpinTimePerWait},{SoftWaitWakeupLatencyPerWait},{HardWaitTotal},{HardWaitNumPerInput},{HardWaitIterationsPerWait},{HardWaitSpinTimePerWait},{HardWaitWakeupLatencyPerWait},{CyclesSpinPerThread},{ElapsedTime},{ElapsedCycles}";
+            => $"{HT},{Affinity},{InputCount},{Complexity},{JoinType},{SpinCount},{ThreadCount},{SoftWaitTotal},{SoftWaitNumPerInput},{SoftWaitIterationsPerWait},{SoftWaitSpinTimePerWait},{SoftWaitWakeupLatencyPerWait},{HardWaitTotal},{HardWaitNumPerInput},{HardWaitIterationsPerWait},{HardWaitSpinTimePerWait},{HardWaitWakeupLatencyPerWait},{CyclesSpinPerThread},{ElapsedTime},{ElapsedCycles},{MWaitXCycles}";
 
         public static ResultItem ConstructAveragedResultItems(IReadOnlyList<ResultItem> others)
         {

@@ -103,7 +103,7 @@ public class PrimeNumbersTrend
         public int Iteration  { get; }
 
         public string CommandLine
-            => $"";
+            => $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --mwaitx_cycle_count {Timeout} --affi {Affinitize} --join_type {JoinType}";
     }
 
 
@@ -174,7 +174,7 @@ public class PrimeNumbersTrend
                 int percentComplete = 5;
                 Console.Write("Progress: 0%");
 
-                foreach (var inputSize in inputs.Range)
+                foreach (var input in inputs.Range)
                 {
                     foreach (var complex in complexity.Range)
                     {
@@ -182,15 +182,17 @@ public class PrimeNumbersTrend
                         {
                             foreach (var affinity in affinitize.Range)
                             {
-                                foreach (var t in timeout.Range)
+                                foreach (var timeOut in timeout.Range)
                                 {
-                                    foreach (var j in joinType)
+                                    foreach (var join in joinType)
                                     {
                                         List<ResultItem> iterations = new();
 
                                         // Retry 5 times and take average.
-                                        for (int iter = 0; iter < 5; iter++) {
-                                            ResultItem? result = RunAndGetResult(iter, inputSize, complex, thread);
+                                        for (int iter = 0; iter < 5; iter++) 
+                                        {
+                                            PrimeNumberInput commandInput = new PrimeNumberInput(iteration: iter, input: input, complexity: complex, thread: thread, affinitize: affinity, timeout: timeOut, joinType: join);
+                                            ResultItem? result = RunAndGetResult(commandInput);
                                             if (result == null)
                                             {
                                                 continue;
@@ -206,7 +208,7 @@ public class PrimeNumbersTrend
                                             }
                                         }
 
-                                        results.Append($"{inputSize}|{complex}|{thread}");
+                                        results.Append($"{input}|{complex}|{thread}");
                                         results.Append($"|{ResultItem.ConstructAveragedResultItems(iterations).ToMarkDownRow()}");
                                         results.AppendLine();
                                     }
@@ -233,12 +235,7 @@ public class PrimeNumbersTrend
         StringBuilder stderrBuilder = new StringBuilder();
         ResultItem? result = null;
 
-        startInfo.Arguments = $"--input_count {input.Input} --complexity {input.Complexity} ";
-
-        if (threads != 0) 
-        {
-            startInfo.Arguments += $" --thread_count {threads}";
-        }
+        startInfo.Arguments = input.CommandLine; 
 
         string output = "", error = "";
         Process process = new Process() {

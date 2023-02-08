@@ -322,6 +322,7 @@ private:
         ARGS(spin_count);
         ARGS(affi);
         ARGS(thread_priority);
+        ARGS(ht);
 
         if (argc == 1)
         {
@@ -350,6 +351,7 @@ private:
             VALIDATE_AND_SET(mwaitx_cycle_count);
             VALIDATE_AND_SET(spin_count);
             VALIDATE_AND_SET(thread_priority);
+            VALIDATE_AND_SET(ht);
 
             printf("Unknown parameter: '%s'\n", parameterName);
             PrintUsageAndExit();
@@ -358,7 +360,7 @@ private:
         complexity %= 32;
 
         // Verifications
-        if (!input_count_used || !complexity_used)
+        if (!input_count_used || !complexity_used || !ht_used)
         {
             printf("Missing mandatory arguments.\n");
             PrintUsageAndExit();
@@ -428,6 +430,21 @@ private:
             SPIN_COUNT = 128 * 1000;
         }
 
+        if (ht_used)
+        {
+            if (ht_used != 0 || ht_used == 1)
+            {
+                printf("Invalid value for '--ht' - this value can either be 0 or 1.\n");
+                PrintUsageAndExit();
+            }
+
+            if (HYPERTHREADING_ENABLED != (ht == 1))
+            {
+                printf("Invalid value '%d' for '--ht' - this is an incorrect configuration. Machine Configuration = %d\n", ht, HYPERTHREADING_ENABLED);
+                PrintUsageAndExit();
+            }
+        }
+
         if (affi_used)
         {
             if (!HYPERTHREADING_ENABLED && (affinity_type == hard_affinitized_physical))
@@ -450,9 +467,10 @@ private:
 
     void PrintUsageAndExit()
     {
-        printf("\nUsage: PrimeNumbers.exe --input_count <numPrimeNumbers> --complexity <complexity> [options]\n\n");
+        printf("\nUsage: PrimeNumbers.exe --input_count <numPrimeNumbers> --complexity <complexity> --ht <ht> [options]\n\n");
         printf("--input_count <N>: Number of prime numbers per thread.\n\n");
         printf("--complexity <N>: Number between 0~31.\n");
+        printf("--ht [0|1]: If 1 then Hyperthread is on else, it is not. If the input doesn't match the machine configuration, then the program will throw an error. \n");
         printf("\n");
         printf("Options:\n");
         printf("--thread_count <N>: Number of threads to use. By default it will use number of cores available in all groups.\n\n");
@@ -482,7 +500,6 @@ public:
     PrimeNumbers(int argc, char** argv)
     {
         HYPERTHREADING_ENABLED = IsHyperThreadingEnabled();
-
         parseArgs(argc, argv);
 
         int userInput_processor_count = PROCESSOR_COUNT;

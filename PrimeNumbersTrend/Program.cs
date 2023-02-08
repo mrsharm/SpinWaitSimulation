@@ -24,6 +24,9 @@ public class Options
     [Option('j', "joinType", Required = false, HelpText = "The Join Type as a Comma Separated List e.g., 1,2,4")]
     public string JoinTypeValues { get; set; } = "1,5";
 
+    [Option('h', "ht", Required = true, HelpText = "Specification if hyperthread is on or off. This must match the machine configuration.")]
+    public bool HT { get; set; }
+
     [Option('a', "affinitizeRange", Required = false, HelpText = "Range of Affinitized value in the form of start-stop-increment e.g., 0-2-1")]
     public string AffinitizeRange { get; set; } = "0-2-2";
 
@@ -195,7 +198,7 @@ public class PrimeNumbersTrend
                                             ResultItem? result = RunAndGetResult(commandInput);
                                             if (result == null)
                                             {
-                                                continue;
+                                                throw new Exception($"Failed with arguments: Input: {input}, Complexity: {complexity}, thread: {thread}, affinity: {affinity},  ");
                                             }
 
                                             iterations.Add(result);

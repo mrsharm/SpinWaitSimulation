@@ -352,6 +352,7 @@ private:
             VALIDATE_AND_SET(spin_count);
             VALIDATE_AND_SET(thread_priority);
             VALIDATE_AND_SET(ht);
+            VALIDATE_AND_SET(affi);
 
             printf("Unknown parameter: '%s'\n", parameterName);
             PrintUsageAndExit();

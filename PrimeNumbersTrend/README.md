@@ -5,8 +5,31 @@ Run the PrimeNumbers.exe repeatedly for various inputs/complexity and dumps the 
 ### Usage
 
 ```
-Usage: PrimeNumbersTrend.exe <Path> <maxInputSize> <maxComplexity> <maxThreads>?
+Usage: PrimeNumbersTrend.exe 
+
+  -p, --pathToPrimeNumberTrend    Required. Path to Prime Number Trend.
+
+  -i, --maxInputSizeRange         Required. Range of Max input size in the form of start-stop-increment e.g., 100-1000-5
+  -c, --maxComplexityRange        Range of Max Complexity in the form of start-stop-increment e.g., 15-25-2
+
+  -t, --maxThreads                Range of Max Number of Threads e.g., 2-20-1
+
+  -j, --joinType                  The Join Type as a Comma Separated List e.g., 1,2,4
+
+  -h, --ht                        Specification if hyperthread is on or off. This must match the machine configuration.
+
+  -a, --affinitizeRange           Range of Affinitized value in the form of start-stop-increment e.g., 0-2-1
+
+  -m, --mwaitTimeoutRange         Range of The Timeout for mwait in the form of start-stop-increment e.g.,
+                                  1000-3000-500.
+
+  -o, --outputPath                Output path of the markdown.
+
+  --help                          Display this help screen.
+
+  --version                       Display version information.
 ```
+
 
 ### Update PrimeNumbers
 Just compile PrimeNumbers in "Release" mode with following change:
@@ -23,26 +46,29 @@ Just compile PrimeNumbers in "Release" mode with following change:
 It displays following data:
 Column name | Meaning
 --|--
-inputSize| Number of input numbers each thread will operate upon
-complex| Cost of execution for each input number. More complexity means bigger input number and hence more time each thread will take to complete
-thread| Number of threads. If <maxThreads> is not passed, this will always be same as no. of logical processors
-iters_per_number| Average iterations to spin for processing **each input number**
-hardwait_per_number| Average hard waits for processing **each input number**
-softwait_per_number| Average soft waits for processing **each input number**
-hardWaitWakeup_per_number| Average clock cycles took to wake-up from hard-wait since restart while processing **each input number**
-softWaitWakeup_per_number| Average clock cycles took to wake-up from soft-wait since restart while processing **each input number**
-iters_number_allthreads| Average iterations threads had to spin for processing **each input number**
-hardwait_number_allthreads| Average hard waits threads made for processing **each input number**
-softwait_number_allthreads| Average soft waits threads made for processing **each input number**
-hardWaitWakeup_number_allthreads| Average clock cycles threads took to wake-up from hard-wait since restart while processing **each input number**
-softWaitWakeup_number_allthreads| Average clock cycles threads took to wake-up from soft-wait since restart while processing **each input number**
-iters_thread_allnumbers| Average iterations taken to process input numbers by **each thread**
-hardwait_thread_allnumbers| Average hard waits made to process input numbers by **each thread**
-softwait_thread_allnumbers| Average soft waits made to process input numbers by **each thread**
-hardWaitWakeup_thread_allnumbers| Average clock cycles took to wake-up from hard-wait since restart to process input numbers by **each thread**
-softWaitWakeup_thread_allnumbers| Average clock cycles took to wake-up from soft-wait since restart to process input numbers by **each thread**
-ticks| Total clock cycles taken to process entire input.
-totalTime | Total time in microseconds taken to process entire input.
+HT| If hyperthreading is enabled or not. 
+Affinity| Choice between affinity, affinity physical core, no affinity.
+Input_Count| Number of input numbers each thread will operate upon
+Complexity| Cost of execution for each input number. More complexity means bigger input number and hence more time each thread will take to complete
+join_type| The type of join used.
+Spin_count | The spin count used.
+Thread_count| Number of threads. If <maxThreads> is not passed, this will always be same as no. of logical processors
+totalSoftWaits | The total number of softwaits. 
+Soft Wait : Total| Total number of softwaits.
+Soft Wait: #/input| Total number of softwaits / (Input_Count * (Thread_count - 1))
+Soft Wait: Iterations/wait| Average Iterations Per Soft Wait.
+Soft Wait: Spin time / wait| Average Spin Loop Time Per Soft Wait.
+Soft Wait: wakeup latency / wait| Average Softwait Wake up Time 
+Hard Wait : Total| Total number of softwaits.
+Hard Wait: #/input| Total number of softwaits / (Input_Count * (Thread_count - 1))
+Hard Wait: Iterations/wait| Average Iterations Per Hard Wait.
+Hard Wait: Spin time / wait| Average Spin Loop Time Per Hard Wait.
+Hard Wait: wakeup latency / wait| Average Hardwait Wake up Time 
+Total cycles spinning | Total Spin Loop Time 
+Cycles spin per thread| Total Spin Loop Time / Thread_Count
+Elapsed time| Total time in microseconds taken to process entire input.
+Elapsed cycles| Elapsed Ticks
+MWaitx Cycles | MWaitx Cycles
 
 Note:
 - `*_per_number` shows metrics to process each number.
@@ -52,69 +78,12 @@ Note:
 
 ### Sample output
 
-Here is the output of sample executions:
-
-`PrimeNumbersTrend.exe path\to\PrimeNumbers.exe 10 5
-
-inputSize|complex|thread|iters_per_number|hardwait_per_number|softwait_per_number|hardWaitWakeup_per_number|softWaitWakeup_per_number|iters_number_allthreads|hardwait_number_allthreads|softwait_number_allthreads|hardWaitWakeup_number_allthreads|softWaitWakeup_number_allthreads|iters_thread_allnumbers|hardwait_thread_allnumbers|softwait_thread_allnumbers|hardWaitWakeup_thread_allnumbers|softWaitWakeup_thread_allnumbers|ticks|totalTime
---|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|
-1|0|1|68298.2|1|1.6|4422.6|4563.4|1365954.2|2.8|19.2|88439.6|91261.2|68298.2|1|1.6|4422.6|4563.4|11044842.2|2988.2
-1|1|1|91417.6|1|1.2|3255.2|3383.8|1828340.8|2.8|19.2|65089.8|67666.6|91417.6|1|1.2|3255.2|3383.8|13453957.6|3640.2
-1|2|1|79572.4|1|1.2|6927.8|7067.2|1591437.4|4.6|17.2|138548.6|141337.4|79572.4|1|1.2|6927.8|7067.2|13861401.4|3750.2
-1|3|1|98164|1|1|6244.6|6378.6|1963267|3.4|18|124882.6|127564.6|98164|1|1|6244.6|6378.6|16171750.2|4375.6
-1|4|1|24899|1|2|398.2|517|497970.8|1|21|7958.6|10332.6|24899|1|2|398.2|517|5020018.6|1358.2
-1|5|1|31127.8|1|1.8|415.8|552|622547|1|20.8|8308.4|11032.8|31127.8|1|1.8|415.8|552|6064671.2|1640.6
-2|0|1|66831.2|1|1.4|270561.6|270658.2|1336611.8|2.8|18.6|5411220.2|5413154.2|133661.8|1|2.4|541122.4|541316|19708316.2|5334.2
-2|1|1|29151|1|1.6|1443.2|1572.4|583009.2|1.2|20.6|28853.4|31439.6|58301.4|1|2.6|2885.8|3144.4|9363153|2533.2
-2|2|1|89950.6|1|1|314895|315021.8|1799000.6|5|15.8|6297891|6300430|179900.6|1|2|629789.6|630043.4|25648959.4|6939.4
-2|3|1|94382.2|1|1|268108.8|268260.4|1887636.4|3.8|17.6|5362169.6|5365201|188764.2|1|2|536217.4|536520.6|26364465.8|7133.8
-2|4|1|77497|1|1|166806.2|166919|1549932.2|1.8|19.6|3336113.8|3338368.8|154993.6|1|2|333611.8|333837.4|21931410.6|5933.8
-2|5|1|47992.8|1|1.6|158594.2|158699.6|959846.6|3.4|18.2|3171875.4|3173983.4|95985.2|1|2.6|317188|317398.8|14737711.4|3987.4
-3|0|1|47030.2|1|1.4|162226.4|162351|940594.2|1.8|19.8|3244516|3247012.2|141089.4|1|3.4|486677.8|487052.4|19691087.8|5327.4
-3|1|1|29361|1|1.6|82536.6|82664.8|587210|1.6|20.2|1650719|1653285.8|88081.8|1|3.6|247608.4|247993.2|13268721.4|3590
-3|2|1|4162.2|1|2|351.4|474|83238.2|1|21|7019|9470.2|12486.2|1|4|1053.2|1421|3425800|926.8
-3|3|1|47678.2|1|1.4|307357.6|307474.6|953552.6|3.2|18.2|6147147.2|6149485.8|143033.4|1|3.4|922072.6|922423.4|20703727.8|5601.6
-3|4|1|78740.4|1|1.2|410160.2|410281.8|1574803.8|4.8|16.8|8203195.2|8205629.6|236221|1.2|3|1230479.8|1230844.8|32762759.8|8864.4
-3|5|1|57898.4|1|1.2|315742.8|315869.8|1157957.8|4.2|17.4|6314842.8|6317389|173694.2|1|3.2|947227|947608.8|24372117.4|6594
-4|0|1|64456.8|1|1.2|356299.4|356422.6|1289124.4|4.4|16.8|7125978.2|7128447.2|257825.4|1.6|3.6|1425196|1425689.8|35501743|9605.4
-4|1|1|17885|1|1.8|37384.2|37467.4|357689.6|1.2|20.8|747671.6|749338.2|71538.4|1|4.8|149534.8|149868|10631350.8|2876.2
-4|2|1|7697|1|2|360.4|474|153930.4|1|21|7199.6|9468.6|30786.6|1|5|1440.4|1894.2|5697624|1541.4
-4|3|1|9825.8|1|1.8|12744.8|12879.8|196502.6|1|20.8|254886.2|257586.4|39301|1|4.8|50977.8|51517.6|6897421.2|1865.8
-4|4|1|29790.4|1|1.6|168083|168197.8|595797.4|3.2|18.6|3361652.4|3363943.4|119159.6|1.2|4.4|672330.8|672789|26974745|7298.4
-4|5|1|19523|1|1.6|42286.6|42400.2|390447.4|1.6|20.2|845723.4|847994|78090|1|4.6|169145|169599.2|11806945.4|3194.4
-5|0|1|60147.2|1|1|281721|281829.6|1202933.8|3.2|17.8|5634412.2|5636581|300733.8|1.2|4.8|1408603.4|1409145.8|40415087|10934.6
-5|1|1|61484.6|1|1.2|316159.2|316285|1229682.4|4|17.6|6323172|6325689|307421|1.4|5|1580793.4|1581422.6|41616913|11259.8
-5|2|1|26522.8|1|1.6|136451.6|136571.2|530447.2|2.2|19.4|2729018.8|2731412.6|132612.2|1.2|5.4|682255|682853.4|19446384.6|5261.4
-5|3|1|20086.2|1|1.8|154746|154864.6|401709|1.8|20.2|3094910|3097286.8|100427.4|1.2|5.8|773728|774321.8|14875108.8|4024.6
-5|4|1|2415.6|1|2|339.8|451|48303|1|21|6780.4|9012|12076.2|1|6|1695.6|2253.2|3339380.2|903.2
-5|5|1|6476.6|1|1.8|952|1042.8|129519.2|1.2|20.6|19030.2|20845.4|32380|1|5.8|4758|5211.8|5967558.2|1614.4
-6|0|1|13226.6|1|1.6|37580.4|37570.6|264522.8|1.4|20.2|751595|751402.8|79357.2|1|6.6|225479|225421.2|11951839.6|3233.6
-6|1|1|64770.2|1|1|316465.6|316590.2|1295398|4|17.4|6329300.2|6331791.8|388619.8|1.6|5.4|1898790.6|1899538|52540886.2|14215.6
-6|2|1|31657|1|1.2|189680|189798|633133|2|19.6|3793590|3795950|189940.2|1.2|6|1138077.2|1138785.2|26858142.2|7266.8
-6|3|1|16255.4|1|1.4|21771.4|21896.6|325093.8|1|20.4|435415.8|437922.8|97528.6|1|6.4|130625.2|131377.2|14009421.8|3790.4
-6|4|1|44496|1|1.2|251773.2|251894.4|889914.4|2.8|18.4|5035453.6|5037880.2|266974.4|1.4|5.8|1510636.6|1511364.4|35991083.2|9737.8
-6|5|1|22685.4|1|1.4|98720.4|98844.4|453698.2|1.4|20|1974401|1976874|136110|1|6.4|592320.6|593062.6|19303520.8|5222.8
-7|0|1|12779.4|1|1.8|46962.2|47073.2|255578.6|1.4|20.4|939231.6|941452|89452.8|1|7.8|328731.4|329508.4|13193312.8|3569.8
-7|1|1|15625.8|1|1.6|54763.8|54876.8|312510.6|1.6|20|1095262.4|1097524|109378.8|1.2|7.4|383342|384133.6|15929433.6|4309.8
-7|2|1|37819.4|1|1.4|209728.4|209834.6|756378.4|2.6|18.8|4194561.4|4196685.2|264732.6|1.4|7|1468097|1468840|35933955.2|9722.4
-7|3|1|29580.2|1|1.6|140349.8|140434.8|591594.8|2.6|19|2806988.2|2808686|207058.4|1.6|7.2|982446.2|983040.4|28775645|7785.6
-7|4|1|1946.2|1|2|428.8|552.8|38914.4|1|21|8563.4|11041.4|13620.4|1|8|2997.4|3864.8|3772960|1020.8
-7|5|1|9429.2|1|1.6|11267.6|11387.4|188571|1|20.6|225337|227736.6|66000.2|1|7.6|78868.2|79708.2|10182059.2|2754.8
-8|0|1|13004.4|1|1.8|67169.4|67279.8|260074.4|1.6|20.2|1343380.6|1345586|104030.2|1.2|8.6|537352.6|538234.6|15263077.6|4129.6
-8|1|1|39594.2|1|1|245835.6|245926.8|791874.4|2.8|18.4|4916701.4|4918522|316750|1.4|7.6|1966681|1967409|43318852.6|11720.2
-8|2|1|4793|1|2|339.6|454.8|95845.8|1|21|6779.6|9083.8|38338.6|1|9|2712|3633.8|6726628|1820
-8|3|1|3514.4|1|2|323.4|451|70279.4|1|21|6457.6|9011|28112.2|1|9|2583.4|3604.4|5365948.4|1451.8
-8|4|1|4057.8|1|1.8|559.4|666|81146.6|1|20.8|11176.8|13306.6|32459.2|1|8.8|4471|5323|5935235|1605.6
-8|5|1|1580.8|1|2|331.2|447.2|31605.8|1|21|6615|8936.4|12642.6|1|9|2646.4|3575|3451194|933.4
-9|0|1|3955.4|1|2|13112.6|13212|79099.8|1|21|262246.4|264228.8|35595.2|1|10|118011|118903.4|6318464.2|1709.4
-9|1|1|3570.8|1|1.8|374.4|476.8|71404.2|1|20.8|7474.8|9530|32132|1|9.8|3364|4288.6|5675486.8|1535.6
-9|2|1|15549.8|1|1.6|106586.8|106708.6|310992.2|1.4|20.2|2131725.4|2134162.4|139946.4|1|9.6|959276.6|960373.4|20085208.6|5434.6
-9|3|1|1407|1|2|322.2|442.8|28131.2|1|21|6435.6|8847.2|12659.2|1|10|2896|3981.6|3430509|928.2
-9|4|1|23074.8|1|1.6|128175|128287.2|461487.4|1.8|19.8|2563488.6|2565732.4|207669.6|1.4|9.2|1153570.2|1154580|28682501|7760.2
-9|5|1|22521.2|1|1.6|203377.6|203422.8|450417.4|1.8|19.8|4067539.8|4068450.2|202688|1.4|9.2|1830393.2|1830802.8|29409303.4|7956.8
-10|0|1|1275.2|1|2|398.6|479.2|25495.2|1|21|7963.6|9577.2|12747.8|1|11|3982|4788.8|3495547|945.6
-10|1|1|16733.2|1|1.4|77850.4|77971.4|334654.6|1.2|20.4|1556994.8|1559424.6|167327.6|1|10.4|778497.6|779712.4|23309959.4|6306.8
-10|2|1|9014.4|1|1.6|28103.4|29354.6|180274.4|1.2|20.4|562055.8|587084.6|90137.6|1|10.6|281028.2|293542.6|13513847|3656.2
-10|3|1|15194|1|1.8|94734.6|94861.4|303871.8|1.8|20|1894682.4|1897218|151936.2|1.4|10.4|947341.6|948609|22076048.4|5972.8
-10|4|1|3550.4|1|1.8|2837.6|2932|71003|1|20.8|56743|58632.2|35501.8|1|10.8|28371.6|29316.4|6300685.6|1704.6
-10|5|1|6271.2|1|1.8|37390|37471|125414|1.2|20.6|747788.2|749411.6|62707.2|1|10.8|373894.4|374706|9877865.2|2672.6
+|HT|Affinity|Input_count|Complexity|join_type|Spin_count|Thread_count|Soft Wait : Total|Soft Wait: #/input|Soft Wait: Iterations/wait|Soft Wait: Spin time / wait|Soft Wait: wakeup latency / wait|Hard Wait : Total|Hard Wait: #/input|Hard Wait: Iterations/wait|Hard Wait: Spin time / wait|Hard Wait: wakeup latency / wait|Total cycles spinning |Cycles spin per thread|Elapsed time|Elapsed cycles|MWaitx Cycles
+|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|
+|no HT|affinity|1000|0||128000|2|1000|1|583.2|20884.2|248|0|0|0|0|0|20883836.8|10441918.4|26|0
+|no HT|affinity|1000|0||128000|2|14|0.014799999999999999|2|2681.4|1106.6|985|0.9852000000000001|2|2192.4|20008.6|2198054.4|1099027.2|37|0
+|no HT|affinity|1000|0||128000|2|1000|1|581.4|20755.8|196.6|0|0|0|0|0|20755276.8|10377638.4|26|0
+|no HT|affinity|1000|0||128000|2|19|0.0196|2|2035.4|330.8|980|0.9802|2|2386.6|17929.2|2378608|1189304|35.6|0
+|no HT|affinity|1000|0||128000|2|1000|1|583.4|20867.4|231.4|0|0|0|0|0|20866812.8|10433406.4|26|0
+|no HT|affinity|1000|0||128000|2|24|0.024200000000000003|2|2193.4|422.4|975|0.9757999999999999|2|2561|17839.6|2551513.6|1275756.8|35.6|0
+|no HT|affinity|1000|0||128000|2|1000|1|582.8|20857.6|230|0|0|0|0|0|20857062.4|10428531.2|26|0

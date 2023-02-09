@@ -12,7 +12,7 @@ public class Options
     [Option('p', "pathToPrimeNumberTrend", Required = true, HelpText = "Path to Prime Number Trend.")]
     public string PathToPrimeNumberTrend { get; set; }
 
-    [Option('i', "maxInputSizeRange", Required = false, HelpText = "Range of Max input size in the form of start-stop-increment e.g., 100-1000-5")]
+    [Option('i', "maxInputSizeRange", Required = true, HelpText = "Range of Max input size in the form of start-stop-increment e.g., 100-1000-5")]
     public string MaxInputSizeRange { get; set; } = "1000-100000-1000";
 
     [Option('c', "maxComplexityRange", Required = false, HelpText = "Range of Max Complexity in the form of start-stop-increment e.g., 15-25-2")]
@@ -24,8 +24,8 @@ public class Options
     [Option('j', "joinType", Required = false, HelpText = "The Join Type as a Comma Separated List e.g., 1,2,4")]
     public string JoinTypeValues { get; set; } = "1,5";
 
-    [Option('h', "ht", Required = true, HelpText = "Specification if hyperthread is on or off. This must match the machine configuration.")]
-    public bool HT { get; set; }
+    [Option('h', "ht", Required = false, HelpText = "Specification if hyperthread is on or off. This must match the machine configuration.")]
+    public int HT { get; set; } = 0; 
 
     [Option('a', "affinitizeRange", Required = false, HelpText = "Range of Affinitized value in the form of start-stop-increment e.g., 0-2-1")]
     public string AffinitizeRange { get; set; } = "0-2-2";
@@ -86,7 +86,7 @@ public class PrimeNumbersTrend
 
     private struct PrimeNumberInput
     {
-        public PrimeNumberInput(int iteration, int input, int complexity, int thread, int affinitize, int timeout, int joinType)
+        public PrimeNumberInput(int iteration, int input, int complexity, int thread, int affinitize, int timeout, int joinType, int ht)
         {
             Input      = input;
             Complexity = complexity;
@@ -95,6 +95,7 @@ public class PrimeNumbersTrend
             Timeout    = timeout;
             JoinType   = joinType;
             Iteration  = iteration;
+            Ht         = ht;
         }
 
         public int Input      { get; }
@@ -104,9 +105,10 @@ public class PrimeNumbersTrend
         public int Timeout    { get; }
         public int JoinType   { get; }
         public int Iteration  { get; }
+        public int Ht { get; }
 
         public string CommandLine
-            => $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --mwaitx_cycle_count {Timeout} --affi {Affinitize} --join_type {JoinType}";
+            => $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --mwaitx_cycle_count {Timeout} --affi {Affinitize} --join_type {JoinType} --ht {Ht}";
     }
 
 
@@ -139,8 +141,8 @@ public class PrimeNumbersTrend
                 };
 
                 StringBuilder results = new StringBuilder();
-                results.Append("inputSize|complexity|thread");
-                results.Append("| HT|Affinity|Input_count");
+                results.Append("|HT|Affinity|Input_count");
+                results.Append("|Complexity");
                 results.Append("|join_type");
                 results.Append("|Spin_count");
                 results.Append("|Thread_count");
@@ -158,6 +160,7 @@ public class PrimeNumbersTrend
                 results.Append("|Cycles spin per thread");
                 results.Append("|Elapsed time");
                 results.Append("|Elapsed cycles");
+                results.Append("|MWaitx Cycles");
                 results.AppendLine();
                 int columns = results.ToString().Count(c => c == '|');
                 for (int col = 0; col <= columns; col++) 
@@ -194,7 +197,7 @@ public class PrimeNumbersTrend
                                         // Retry 5 times and take average.
                                         for (int iter = 0; iter < 5; iter++) 
                                         {
-                                            PrimeNumberInput commandInput = new PrimeNumberInput(iteration: iter, input: input, complexity: complex, thread: thread, affinitize: affinity, timeout: timeOut, joinType: join);
+                                            PrimeNumberInput commandInput = new PrimeNumberInput(iteration: iter, input: input, complexity: complex, thread: thread, affinitize: affinity, timeout: timeOut, joinType: join, ht: o.HT); 
                                             ResultItem? result = RunAndGetResult(commandInput);
                                             if (result == null)
                                             {
@@ -211,7 +214,6 @@ public class PrimeNumbersTrend
                                             }
                                         }
 
-                                        results.Append($"{input}|{complex}|{thread}");
                                         results.Append($"|{ResultItem.ConstructAveragedResultItems(iterations).ToMarkDownRow()}");
                                         results.AppendLine();
                                     }

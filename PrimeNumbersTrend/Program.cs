@@ -1,181 +1,246 @@
-﻿using System;
+﻿using CommandLine;
+using DataModel;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Text;
-using System.Threading;
-//using System.Linq;
 
-public class PrimeNumbersTrend {
+public class Options
+{
+    [Option('p', "pathToPrimeNumberTrend", Required = true, HelpText = "Path to Prime Number Trend.")]
+    public string PathToPrimeNumberTrend { get; set; }
 
-    private static ProcessStartInfo startInfo;
+    [Option('i', "maxInputSizeRange", Required = true, HelpText = "Range of Max input size in the form of start-stop-increment e.g., 100-1000-5")]
+    public string MaxInputSizeRange { get; set; } = "1000-100000-1000";
 
-    public static void Main(String[] args) {
-        if ((args.Length != 3) && (args.Length != 4)) {
-            Console.WriteLine("Usage: PrimeNumbersTrend.exe <Path> <maxInputSize> <maxComplexity> <maxThreads>?");
-            Console.WriteLine("<Path>: Full path to PrimeNumbers.exe");
+    [Option('c', "maxComplexityRange", Required = false, HelpText = "Range of Max Complexity in the form of start-stop-increment e.g., 15-25-2")]
+    public string MaxComplexityRange { get; set; } = "15-25-2";
 
-            Console.WriteLine("<maxInputSize>: Max Input size.");
-            Console.WriteLine("<maxComplexity>: Max Complexity.");
-            Console.WriteLine("<maxThreads>: Max Threads.");
-            Environment.Exit(1);
-        }
+    [Option('t', "maxThreads", Required = false, HelpText = "Range of Max Number of Threads e.g., 2-20-1")]
+    public string MaxThreadsRange { get; set; } = $"2-{Environment.ProcessorCount}-1";
 
-        string primeNumbersExe = args[0];
-        if (!File.Exists(primeNumbersExe)) {
-            Console.WriteLine($"{primeNumbersExe} not present.");
-            Environment.Exit(1);
-        }
+    [Option('j', "joinType", Required = false, HelpText = "The Join Type as a Comma Separated List e.g., 1,2,4")]
+    public string JoinTypeValues { get; set; } = "1,5";
 
-        int maxInputSize = Int32.Parse(args[1]);
-        int maxComplexity = Int32.Parse(args[2]);
-        int maxThreads = 1;
-        bool useDefaultThreads = true;
-        if (args.Length > 3) {
-            int inputThread = Int32.Parse(args[3]);
-            // Ensure we process only valid thread count
-            if (inputThread > 1) {
-                maxThreads = inputThread;
-                useDefaultThreads = false;
+    [Option('h', "ht", Required = false, HelpText = "Specification if hyperthread is on or off. This must match the machine configuration.")]
+    public int HT { get; set; } = 0; 
+
+    [Option('a', "affinitizeRange", Required = false, HelpText = "Range of Affinitized value in the form of start-stop-increment e.g., 0-2-1")]
+    public string AffinitizeRange { get; set; } = "0-2-2";
+
+    [Option('m', "mwaitTimeoutRange", Required = false, HelpText = "Range of The Timeout for mwait in the form of start-stop-increment e.g., 1000-3000-500.")]
+    // TODO: Fix make the range variable.: [Maoni] I would do 1000 (I think the OS uses 1024 right?) to 40,000. 40,000 would be comparable to a context switch cost I believe. And I would increase with smaller steps when the values are small and bigger steps whe the values are big, so from 1000 to 5000 I would do 200 increments and 5000 to 10,000 500 increments and etc.
+    public string MWaitTimeoutRange { get; set; } = "1000-5000-200";
+
+    [Option('o', "outputPath", Required = false, HelpText = "Output path of the markdown.")]
+    public string? OutputPath { get; set; }
+}
+
+public class PrimeNumbersTrend 
+{
+    // Range format is start-stop-increment
+    private struct RangeValue
+    {
+        public static RangeValue Create(string line)
+        {
+            if (string.IsNullOrEmpty(line))
+            {
+                throw new ArgumentException("Range Values are empty!"); 
             }
-        }
 
-        startInfo = new ProcessStartInfo() {
-            FileName = primeNumbersExe,
-            Arguments = "",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-
-        StringBuilder results = new StringBuilder();
-        results.Append("inputSize|complex|thread");
-        results.Append("|iters_per_number");
-        results.Append("|hardwait_per_number");
-        results.Append("|softwait_per_number");
-        results.Append("|hardWaitWakeup_per_number");
-        results.Append("|softWaitWakeup_per_number");
-        results.Append("|iters_number_allthreads");
-        results.Append("|hardwait_number_allthreads");
-        results.Append("|softwait_number_allthreads");
-        results.Append("|hardWaitWakeup_number_allthreads");
-        results.Append("|softWaitWakeup_number_allthreads");
-        results.Append("|iters_thread_allnumbers");
-        results.Append("|hardwait_thread_allnumbers");
-        results.Append("|softwait_thread_allnumbers");
-        results.Append("|hardWaitWakeup_thread_allnumbers");
-        results.Append("|softWaitWakeup_thread_allnumbers");
-        results.Append("|ticks");
-        results.Append("|totalTime");
-        results.AppendLine();
-        int columns = results.ToString().Count(c => c == '|');
-        for (int col = 0; col <= columns; col++) {
-            results.Append("--|");
-        }
-        results.AppendLine();
-
-        int progressIteration = 0;
-        int totalIterations = 5 * maxInputSize * (maxComplexity+1);
-        if (!useDefaultThreads) {
-            totalIterations *= maxThreads;
-        }
-        int percentComplete = 5;
-        Console.Write("Progress: 0%");
-        for (int inputSize = 1; inputSize <= maxInputSize; inputSize++) {
-            for (int complex = 0; complex <= maxComplexity; complex++) {
-                for (int thread = 1; thread <= maxThreads; thread++) {
-                    List<long> iters_pernumber = new();
-                    List<long> hardwait_pernumber = new();
-                    List<long> softwait_pernumber = new();
-                    List<long> hardWaitWakeup_pernumber = new();
-                    List<long> softWaitWakeup_pernumber = new();
-                    List<long> iters_number = new();
-                    List<long> hardwait_number = new();
-                    List<long> softwait_number = new();
-                    List<long> hardWaitWakeup_number = new();
-                    List<long> softWaitWakeup_number = new();
-                    List<long> iters_thread = new();
-                    List<long> hardwait_thread = new();
-                    List<long> softwait_thread = new();
-                    List<long> hardWaitWakeup_thread = new();
-                    List<long> softWaitWakeup_thread = new();
-                    List<long> ticks = new();
-                    List<long> totalTime = new();
-
-                    // Retry 5 times and take average.
-                    for (int iter = 0; iter < 5; iter++) {
-                        var result = RunAndGetResult(iter, inputSize, complex, useDefaultThreads ? 0 : thread);
-                        if (IsEmpty(result)) continue;
-
-                        int col = 3;
-                        iters_pernumber.Add(result[col++]);
-                        hardwait_pernumber.Add(result[col++]);
-                        softwait_pernumber.Add(result[col++]);
-                        hardWaitWakeup_pernumber.Add(result[col++]);
-                        softWaitWakeup_pernumber.Add(result[col++]);
-                        iters_number.Add(result[col++]);
-                        hardwait_number.Add(result[col++]);
-                        softwait_number.Add(result[col++]);
-                        hardWaitWakeup_number.Add(result[col++]);
-                        softWaitWakeup_number.Add(result[col++]);
-                        iters_thread.Add(result[col++]);
-                        hardwait_thread.Add(result[col++]);
-                        softwait_thread.Add(result[col++]);
-                        hardWaitWakeup_thread.Add(result[col++]);
-                        softWaitWakeup_thread.Add(result[col++]);
-                        ticks.Add(result[col++]);
-                        totalTime.Add(result[col]);
-                        Debug.Assert(col == columns);
-
-                        progressIteration++;
-                        int percent = (progressIteration * 100) / totalIterations;
-                        if (percent == percentComplete) {
-                            Console.Write($" {percentComplete}%");
-                            percentComplete += 5;
-                        }
-                    }
-
-                    results.Append($"{inputSize}|{complex}|{thread}");
-                    results.Append($"|{iters_pernumber.Average()}");
-                    results.Append($"|{hardwait_pernumber.Average()}");
-                    results.Append($"|{softwait_pernumber.Average()}");
-                    results.Append($"|{hardWaitWakeup_pernumber.Average()}");
-                    results.Append($"|{softWaitWakeup_pernumber.Average()}");
-                    results.Append($"|{iters_number.Average()}");
-                    results.Append($"|{hardwait_number.Average()}");
-                    results.Append($"|{softwait_number.Average()}");
-                    results.Append($"|{hardWaitWakeup_number.Average()}");
-                    results.Append($"|{softWaitWakeup_number.Average()}");
-                    results.Append($"|{iters_thread.Average()}");
-                    results.Append($"|{hardwait_thread.Average()}");
-                    results.Append($"|{softwait_thread.Average()}");
-                    results.Append($"|{hardWaitWakeup_thread.Average()}");
-                    results.Append($"|{softWaitWakeup_thread.Average()}");
-                    results.Append($"|{ticks.Average()}");
-                    results.Append($"|{totalTime.Average()}");
-                    results.AppendLine();
-                }
-
+            string[] splits = line.Split("-", StringSplitOptions.TrimEntries);
+            if (splits.Length != 3 ) 
+            {
+                throw new ArgumentException("Range Values have the format of start-stop-increment. Please ensure that the input is in the following format.");
             }
+
+            int start = int.Parse(splits[0]);
+            int stop = int.Parse(splits[1]);
+            int increment = int.Parse(splits[2]);
+
+            List<int> range = new();
+
+            for (int i = start; i <= stop; i += increment)
+            {
+                range.Add(i);
+            }
+
+            RangeValue value = new()
+            {
+                Start     = start,
+                Stop      = stop,
+                Increment = increment,
+                Range     = range
+            };
+
+            return value;
         }
-        Console.WriteLine();
-        Console.WriteLine("-------------------------");
-        Console.WriteLine(results.ToString());
+
+        public int Start { get; init; }
+        public int Stop { get; init;  }
+        public int Increment { get; init; }
+        public IReadOnlyList<int> Range { get; init; }
+    }
+
+    private struct PrimeNumberInput
+    {
+        public PrimeNumberInput(int iteration, int input, int complexity, int thread, int affinitize, int timeout, int joinType, int ht)
+        {
+            Input      = input;
+            Complexity = complexity;
+            Thread     = thread;
+            Affinitize = affinitize;
+            Timeout    = timeout;
+            JoinType   = joinType;
+            Iteration  = iteration;
+            Ht         = ht;
+        }
+
+        public int Input      { get; }
+        public int Complexity { get; }
+        public int Thread     { get; }
+        public int Affinitize { get; }
+        public int Timeout    { get; }
+        public int JoinType   { get; }
+        public int Iteration  { get; }
+        public int Ht { get; }
+
+        public string CommandLine
+            => $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --mwaitx_cycle_count {Timeout} --affi {Affinitize} --join_type {JoinType} --ht {Ht}";
     }
 
 
-    private static List<long> RunAndGetResult(int iter, int inputSize, int complexity, int threads) {
-        List<long> result = null;
+    private static ProcessStartInfo startInfo;
+
+    public static void Main(String[] args) 
+    {
+        Parser.Default.ParseArguments<Options>(args)
+            .WithParsed<Options>(o =>
+            {
+                if (string.IsNullOrEmpty(o.PathToPrimeNumberTrend) || !File.Exists(o.PathToPrimeNumberTrend))
+                {
+                    Console.WriteLine($"{o.PathToPrimeNumberTrend} not present.");
+                    Environment.Exit(1);
+                }
+
+                RangeValue inputs     = RangeValue.Create(o.MaxInputSizeRange);
+                RangeValue complexity = RangeValue.Create(o.MaxComplexityRange);
+                RangeValue threads    = RangeValue.Create(o.MaxThreadsRange);
+                RangeValue affinitize = RangeValue.Create(o.AffinitizeRange);
+                RangeValue timeout    = RangeValue.Create(o.MWaitTimeoutRange);
+                List<int> joinType    = o.JoinTypeValues.Split(",", StringSplitOptions.TrimEntries).Select(j => int.Parse(j)).ToList();
+
+                startInfo = new ProcessStartInfo() {
+                    FileName = o.PathToPrimeNumberTrend,
+                    Arguments = "",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                };
+
+                StringBuilder results = new StringBuilder();
+                results.Append("|HT|Affinity|Input_count");
+                results.Append("|Complexity");
+                results.Append("|join_type");
+                results.Append("|Spin_count");
+                results.Append("|Thread_count");
+                results.Append("|Soft Wait : Total");
+                results.Append("|Soft Wait: #/input");
+                results.Append("|Soft Wait: Iterations/wait");
+                results.Append("|Soft Wait: Spin time / wait");
+                results.Append("|Soft Wait: wakeup latency / wait");
+                results.Append("|Hard Wait : Total");
+                results.Append("|Hard Wait: #/input");
+                results.Append("|Hard Wait: Iterations/wait");
+                results.Append("|Hard Wait: Spin time / wait");
+                results.Append("|Hard Wait: wakeup latency / wait");
+                results.Append("|Total cycles spinning ");
+                results.Append("|Cycles spin per thread");
+                results.Append("|Elapsed time");
+                results.Append("|Elapsed cycles");
+                results.Append("|MWaitx Cycles");
+                results.AppendLine();
+                int columns = results.ToString().Count(c => c == '|');
+                for (int col = 0; col <= columns; col++) 
+                {
+                    results.Append("--|");
+                }
+                results.AppendLine();
+
+                int progressIteration = 0;
+                int totalIterations = 5 * inputs.Range.Count 
+                                        * complexity.Range.Count 
+                                        * threads.Range.Count 
+                                        * affinitize.Range.Count
+                                        * timeout.Range.Count
+                                        * joinType.Count; 
+
+                int percentComplete = 5;
+                Console.Write("Progress: 0%");
+
+                foreach (var input in inputs.Range)
+                {
+                    foreach (var complex in complexity.Range)
+                    {
+                        foreach (var thread in threads.Range)
+                        {
+                            foreach (var affinity in affinitize.Range)
+                            {
+                                foreach (var timeOut in timeout.Range)
+                                {
+                                    foreach (var join in joinType)
+                                    {
+                                        List<ResultItem> iterations = new();
+
+                                        // Retry 5 times and take average.
+                                        for (int iter = 0; iter < 5; iter++) 
+                                        {
+                                            PrimeNumberInput commandInput = new PrimeNumberInput(iteration: iter, input: input, complexity: complex, thread: thread, affinitize: affinity, timeout: timeOut, joinType: join, ht: o.HT); 
+                                            ResultItem? result = RunAndGetResult(commandInput);
+                                            if (result == null)
+                                            {
+                                                throw new Exception($"Failed with arguments: Input: {input}, Complexity: {complexity}, thread: {thread}, affinity: {affinity}, timeout: {timeOut}, joinType: {join}.");
+                                            }
+
+                                            iterations.Add(result);
+
+                                            progressIteration++;
+                                            int percent = (progressIteration * 100) / totalIterations;
+                                            if (percent == percentComplete) {
+                                                Console.Write($" {percentComplete}%");
+                                                percentComplete += 5;
+                                            }
+                                        }
+
+                                        results.Append($"|{ResultItem.ConstructAveragedResultItems(iterations).ToMarkDownRow()}");
+                                        results.AppendLine();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Console.WriteLine();
+                Console.WriteLine("-------------------------");
+                Console.WriteLine(results.ToString());
+
+                if (string.IsNullOrEmpty(o.OutputPath))
+                {
+                    File.WriteAllText(o.OutputPath, results.ToString());
+                }
+            });
+    }
+
+    private static ResultItem? RunAndGetResult(PrimeNumberInput input)
+    {
         StringBuilder stdoutBuilder = new StringBuilder();
         StringBuilder stderrBuilder = new StringBuilder();
+        ResultItem? result = null;
 
-        startInfo.Arguments = $"{inputSize} {complexity} ";
-
-        if (threads != 0) {
-            startInfo.Arguments += $" {threads}";
-        }
+        startInfo.Arguments = input.CommandLine; 
 
         string output = "", error = "";
         Process process = new Process() {
@@ -188,7 +253,6 @@ public class PrimeNumbersTrend {
                 if (!string.IsNullOrEmpty(output)) {
                     stdoutBuilder.AppendLine(output);
                 }
-                //Console.WriteLine(output);
             }
         };
         process.ErrorDataReceived += (sender, args) => {
@@ -219,24 +283,17 @@ public class PrimeNumbersTrend {
                     }
                     string resultOutput = outputLine.Replace("OUT] ", string.Empty);
                     string[] parsedOutput = resultOutput.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                    result = parsedOutput.Select(x => long.Parse(x)).ToList();
+                    result = new ResultItem(parsedOutput);
+                    return result;
                 }
             }
-            else {
-                Console.WriteLine("*** Exitcode " + process.ExitCode);
-            }
         }
 
-        if (IsEmpty(result)) {
-            Console.WriteLine("[OUT]: ");
-            Console.WriteLine(output);
-            Console.WriteLine("[ERR]: ");
-            Console.WriteLine(error);
-        }
+        Console.WriteLine("*** Exitcode " + process?.ExitCode);
+        Console.WriteLine("[OUT]: ");
+        Console.WriteLine(output);
+        Console.WriteLine("[ERR]: ");
+        Console.WriteLine(error);
         return result;
     }
-
-    private static bool IsEmpty(List<long> result) {
-        return ((result == null) || (result.Count == 0));
-    }
-}
+} 

@@ -432,7 +432,7 @@ private:
 
         if (ht_used)
         {
-            if (ht_used != 0 || ht_used == 1)
+            if (ht_used != 0 && ht_used != 1)
             {
                 printf("Invalid value for '--ht' - this value can either be 0 or 1.\n");
                 PrintUsageAndExit();

@@ -198,7 +198,7 @@ public class PrimeNumbersTrend
                                             ResultItem? result = RunAndGetResult(commandInput);
                                             if (result == null)
                                             {
-                                                throw new Exception($"Failed with arguments: Input: {input}, Complexity: {complexity}, thread: {thread}, affinity: {affinity},  ");
+                                                throw new Exception($"Failed with arguments: Input: {input}, Complexity: {complexity}, thread: {thread}, affinity: {affinity}, timeout: {timeOut}, joinType: {join}.");
                                             }
 
                                             iterations.Add(result);

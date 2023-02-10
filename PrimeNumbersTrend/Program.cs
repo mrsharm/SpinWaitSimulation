@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 public class Options
 {
@@ -19,7 +21,7 @@ public class Options
     public string MaxComplexityRange { get; set; } = "15-25-2";
 
     [Option('t', "maxThreads", Required = false, HelpText = "Range of Max Number of Threads e.g., 2-20-1")]
-    public string MaxThreadsRange { get; set; } = $"2-{Environment.ProcessorCount}-1";
+    public string MaxThreadsRange { get; set; } = $"2-{Environment.ProcessorCount}-2";
 
     [Option('j', "joinType", Required = false, HelpText = "The Join Type as a Comma Separated List e.g., 1,2,4")]
     public string JoinTypeValues { get; set; } = "1,5";
@@ -27,9 +29,12 @@ public class Options
     [Option('a', "affinitizeRange", Required = false, HelpText = "Range of Affinitized value in the form of start-stop-increment e.g., 0-2-1")]
     public string AffinitizeRange { get; set; } = "0-2-2";
 
-    [Option('m', "mwaitTimeoutRange", Required = false, HelpText = "Range of The Timeout for mwait in the form of start-stop-increment e.g., 1000-3000-500.")]
+    [Option('m', "mwaitTimeoutRange", Required = false, HelpText = "Range of The Timeout for mwait in the form of start-stop-increment only applicable for join type 5 e.g., 1000-3000-500.")]
     // TODO: Fix make the range variable.: [Maoni] I would do 1000 (I think the OS uses 1024 right?) to 40,000. 40,000 would be comparable to a context switch cost I believe. And I would increase with smaller steps when the values are small and bigger steps whe the values are big, so from 1000 to 5000 I would do 200 increments and 5000 to 10,000 500 increments and etc.
-    public string MWaitTimeoutRange { get; set; } = "1000-5000-200";
+    public string MWaitTimeoutRange { get; set; } = "1000-40000-200";
+
+    [Option('s', "spinCount", Required = false, HelpText = "Spin Count only applicable and used in the case where join_type == 1 e.g., 1000-3000-500.")]
+    public string SpinCountRange { get; set; } = "64000-128000-64000";
 
     [Option('o', "outputPath", Required = false, HelpText = "Output path of the markdown.")]
     public string? OutputPath { get; set; }
@@ -83,7 +88,7 @@ public class PrimeNumbersTrend
 
     private struct PrimeNumberInput
     {
-        public PrimeNumberInput(int iteration, int input, int complexity, int thread, int affinitize, int timeout, int joinType)
+        public PrimeNumberInput(int iteration, int input, int complexity, int thread, int affinitize, int? timeout, int joinType, int? spinCount)
         {
             Input      = input;
             Complexity = complexity;
@@ -92,20 +97,22 @@ public class PrimeNumbersTrend
             Timeout    = timeout;
             JoinType   = joinType;
             Iteration  = iteration;
+            SpinCount = spinCount;
         }
 
         public int Input      { get; }
         public int Complexity { get; }
         public int Thread     { get; }
         public int Affinitize { get; }
-        public int Timeout    { get; }
+        public int? Timeout    { get; }
         public int JoinType   { get; }
         public int Iteration  { get; }
+        public int? SpinCount { get; }
 
-        public string CommandLine
-            => $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --mwaitx_cycle_count {Timeout} --affi {Affinitize} --join_type {JoinType}";
+        public string CommandLine =>
+            SpinCount.HasValue ? $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --affi {Affinitize} --join_type {JoinType} --spin_count {SpinCount.Value}" :
+            $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --mwaitx_cycle_count {Timeout.Value} --affi {Affinitize} --join_type {JoinType}"; 
     }
-
 
     private static ProcessStartInfo startInfo;
 
@@ -124,7 +131,9 @@ public class PrimeNumbersTrend
                 RangeValue complexity = RangeValue.Create(o.MaxComplexityRange);
                 RangeValue threads    = RangeValue.Create(o.MaxThreadsRange);
                 RangeValue affinitize = RangeValue.Create(o.AffinitizeRange);
-                RangeValue timeout    = RangeValue.Create(o.MWaitTimeoutRange);
+                RangeValue spinCountRange = RangeValue.Create(o.SpinCountRange);
+                RangeValue mwaitCountRange = RangeValue.Create(o.MWaitTimeoutRange);
+
                 List<int> joinType    = o.JoinTypeValues.Split(",", StringSplitOptions.TrimEntries).Select(j => int.Parse(j)).ToList();
 
                 startInfo = new ProcessStartInfo() {
@@ -164,12 +173,11 @@ public class PrimeNumbersTrend
                 results.AppendLine();
 
                 int progressIteration = 0;
-                int totalIterations = 5 * inputs.Range.Count 
-                                        * complexity.Range.Count 
-                                        * threads.Range.Count 
+                int totalIterations = 5 * inputs.Range.Count
+                                        * complexity.Range.Count
+                                        * threads.Range.Count
                                         * affinitize.Range.Count
-                                        * timeout.Range.Count
-                                        * joinType.Count; 
+                                        * joinType.Count;
 
                 int percentComplete = 5;
                 Console.Write("Progress: 0%");
@@ -182,29 +190,69 @@ public class PrimeNumbersTrend
                         {
                             foreach (var affinity in affinitize.Range)
                             {
-                                foreach (var timeOut in timeout.Range)
                                 {
                                     foreach (var join in joinType)
                                     {
                                         List<ResultItem> iterations = new();
-
-                                        // Retry 5 times and take average.
-                                        for (int iter = 0; iter < 5; iter++) 
+                                        if (join == 1)
                                         {
-                                            PrimeNumberInput commandInput = new PrimeNumberInput(iteration: iter, input: input, complexity: complex, thread: thread, affinitize: affinity, timeout: timeOut, joinType: join);
-                                            ResultItem? result = RunAndGetResult(commandInput);
-                                            if (result == null)
+                                            totalIterations *= spinCountRange.Range.Count;
+                                            foreach (var spinCount in spinCountRange.Range)
                                             {
-                                                continue;
+
+                                                // Retry 5 times and take average.
+                                                for (int iter = 0; iter < 5; iter++)
+                                                {
+                                                    PrimeNumberInput commandInput = new PrimeNumberInput(iteration: iter, input: input, complexity: complex, thread: thread, affinitize: affinity, timeout: spinCount, joinType: join, spinCount: spinCount);
+                                                    ResultItem? result = RunAndGetResult(commandInput);
+                                                    if (result == null)
+                                                    {
+                                                        Console.WriteLine($"Failed with arguments: Input: {input}, Complexity: {complexity}, thread: {thread}, affinity: {affinity}, timeout: {spinCount}, joinType: {join}.");
+                                                    }
+
+                                                    iterations.Add(result);
+
+                                                    progressIteration++;
+                                                    int percent = (progressIteration * 100) / totalIterations;
+                                                    if (percent == percentComplete)
+                                                    {
+                                                        Console.Write($" {percentComplete}%");
+                                                        percentComplete += 5;
+                                                    }
+                                                }
+
+                                                results.Append($"{input}|{complex}|{thread}");
+                                                results.Append($"|{ResultItem.ConstructAveragedResultItems(iterations).ToMarkDownRow()}");
+                                                results.AppendLine();
                                             }
+                                        }
 
-                                            iterations.Add(result);
+                                        else
+                                        {
+                                            totalIterations *= mwaitCountRange.Range.Count;
 
-                                            progressIteration++;
-                                            int percent = (progressIteration * 100) / totalIterations;
-                                            if (percent == percentComplete) {
-                                                Console.Write($" {percentComplete}%");
-                                                percentComplete += 5;
+                                            foreach (var mwaitCount in mwaitCountRange.Range)
+                                            {
+                                                // Retry 5 times and take average.
+                                                for (int iter = 0; iter < 5; iter++)
+                                                {
+                                                    PrimeNumberInput commandInput = new PrimeNumberInput(iteration: iter, input: input, complexity: complex, thread: thread, affinitize: affinity, timeout: mwaitCount, joinType: join, spinCount: null);
+                                                    ResultItem? result = RunAndGetResult(commandInput);
+                                                    if (result == null)
+                                                    {
+                                                        Console.WriteLine($"Failed with arguments: Input: {input}, Complexity: {complexity}, thread: {thread}, affinity: {affinity}, joinType: {join}, timeout: {mwaitCount}.");
+                                                    }
+
+                                                    iterations.Add(result);
+
+                                                    progressIteration++;
+                                                    int percent = (progressIteration * 100) / totalIterations;
+                                                    if (percent == percentComplete)
+                                                    {
+                                                        Console.Write($" {percentComplete}%");
+                                                        percentComplete += 5;
+                                                    }
+                                                }
                                             }
                                         }
 
@@ -222,7 +270,7 @@ public class PrimeNumbersTrend
                 Console.WriteLine("-------------------------");
                 Console.WriteLine(results.ToString());
 
-                if (string.IsNullOrEmpty(o.OutputPath))
+                if (!string.IsNullOrEmpty(o.OutputPath))
                 {
                     File.WriteAllText(o.OutputPath, results.ToString());
                 }

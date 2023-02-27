@@ -441,7 +441,7 @@ private:
 
             if (HYPERTHREADING_ENABLED != (ht == 1))
             {
-                printf("Invalid value '%d' for '--ht' - this is an incorrect configuration. Machine Configuration = %d\n", ht, HYPERTHREADING_ENABLED);
+                printf("Invalid value '%d' for '--ht' - this is an incorrect configuration. HT is currently %s, but user has passed in %d. Setting the correct --ht parameter is required.\n", ht, (HYPERTHREADING_ENABLED ? "enabled" : "disabled"), ht);
                 PrintUsageAndExit();
             }
         }
@@ -621,7 +621,7 @@ public:
         if (affinity_type != not_affinitized)
         {
             // Hard affinitize the threads to cores.
-            SetThreadAffinity(PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT, threadHandles, HYPERTHREADING_ENABLED);
+			SetThreadAffinity(PROCESSOR_COUNT, PROCESSOR_GROUP_COUNT, threadHandles, (affinity_type == hard_affinitized_physical));
         }
 
         // https://stackoverflow.com/a/27739925
@@ -734,7 +734,8 @@ public:
         PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; Total cycles in spin: %s; Spin cycles / thread: %s; ", formatNumber(elapsed_ticks), formatNumber(elapsed_time), formatNumber(totalSpinLoopTime), formatNumber(totalSpinLoopTime / PROCESSOR_COUNT));
         PRINT_STATS("Elapsed cycles: %s; Elapsed time (ms): %s; // Average number per thread", formatNumber(totalElapsedTicks/ PROCESSOR_COUNT), formatNumber(totalElapsedTime / PROCESSOR_COUNT));
 
-        PRINT_ONELINE_STATS("OUT] %s|%s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu|%llu",
+        //printf("HT | Affinity | Input_count | complexity | join_type | Spin_count | Thread_Count | Soft Wait: Total | Soft Wait: #/input | Soft Wait: Iterations/wait | Soft Wait: Spin time/wait | Soft wait: wakeup latency/wait Hard Wait: Total | Hard Wait: #/input | Hard Wait: Iterations/wait | Hard Wait: Spin time/wait | Hard wait: wakeup latency/wait Total cycles spinning | Cycles spin per thread Elapsed time | Elapsed cycles | MWaitXCycles\n");
+        PRINT_ONELINE_STATS("%s|%s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu|%s",
             //  HT | Affinity | Input_count | complexity | join_type | Spin_count | Thread_Count |
             (HYPERTHREADING_ENABLED ? "HT" : "no HT"), str_affinity_attribute[affinity_type], INPUT_COUNT, COMPLEXITY, str_join_types[JOIN_TYPE], SPIN_COUNT, PROCESSOR_COUNT,
             // Soft Wait: Total | Soft Wait: #/input | Soft Wait: Iterations/wait | Soft Wait: Spin time/wait | Soft wait: wakeup latency/wait

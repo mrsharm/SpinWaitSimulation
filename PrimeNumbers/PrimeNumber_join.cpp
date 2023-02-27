@@ -738,9 +738,9 @@ public:
         PRINT_ONELINE_STATS("%s|%s|%d|%d|%s|%d|%d|%d|%10.03f|%llu|%llu|%llu|%d|%10.03f|%llu|%llu|%llu|%llu|%llu|%llu|%llu|%s",
             //  HT | Affinity | Input_count | complexity | join_type | Spin_count | Thread_Count |
             (HYPERTHREADING_ENABLED ? "HT" : "no HT"), str_affinity_attribute[affinity_type], INPUT_COUNT, COMPLEXITY, str_join_types[JOIN_TYPE], SPIN_COUNT, PROCESSOR_COUNT,
-            // Soft Wait: Total | Soft Wait: #/input | Soft Wait: Iterations/wait | Soft Wait: Spin time/wait | Soft wait: wakeup latency/wait
+            // Soft Wait: Total | Soft Wait: #/input | Soft Wait: Iterations/wait | Soft Wait: Spin cpu time | Soft wait: wakeup latency/wait
             totalSoftWaits, ((double)totalSoftWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), avgIterationsPerSoftWait, avgSpinLoopTimePerSoftWait, avgSoftWaitWakeupTime,
-            // Hard Wait: Total | Hard Wait: #/input | Hard Wait: Iterations/wait | Hard Wait: Spin time/wait | Hard wait: wakeup latency/wait
+            // Hard Wait: Total | Hard Wait: #/input | Hard Wait: Iterations/wait | Hard Wait: Spin cpu time | Hard wait: wakeup latency/wait
             totalHardWaits, ((double)totalHardWaits / (INPUT_COUNT * (PROCESSOR_COUNT - 1))), avgIterationsPerHardWait, avgSpinLoopTimePerHardWait, avgHardWaitWakeupTime,
             // Total cycles spinning | Cycles spin per thread
             totalSpinLoopTime, (totalSpinLoopTime / PROCESSOR_COUNT),

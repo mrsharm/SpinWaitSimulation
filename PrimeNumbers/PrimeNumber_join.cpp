@@ -17,10 +17,17 @@ const char* str_join_types[] =
     "invalid",
     "t_join_pause",
     "t_join_pause_soft_wait_only",
+
     "t_join_mwaitx_loop",
     "t_join_mwaitx_loop_soft_wait_only",
     "t_join_mwaitx_noloop",
     "t_join_mwaitx_noloop_soft_wait_only",
+
+    "t_join_umwait_loop",
+    "t_join_umwait_loop_soft_wait_only",
+    "t_join_umwait_noloop",
+    "t_join_umwait_noloop_soft_wait_only",
+
     "t_join_hard_wait_only",
     "t_join_no_pause",
     "t_join_pause2",
@@ -279,6 +286,7 @@ private:
     int PROCESSOR_COUNT = -1;
     int PROCESSOR_GROUP_COUNT = -1; 
     int MWAITX_CYCLES = 0;
+    bool UMWAIT_LOW_POWER = false;
     int INPUT_COUNT = -1;
     int COMPLEXITY = -1;
     int JOIN_TYPE = -1;
@@ -318,6 +326,7 @@ private:
         ARGS(complexity);
         ARGS(thread_count);
         ARGS(mwaitx_cycle_count);
+        ARGS(umwait_power_state);
         ARGS(join_type);
         ARGS(spin_count);
         ARGS(affi);
@@ -349,6 +358,7 @@ private:
             VALIDATE_AND_SET(thread_count);
             VALIDATE_AND_SET(join_type);
             VALIDATE_AND_SET(mwaitx_cycle_count);
+            VALIDATE_AND_SET(umwait_power_state);
             VALIDATE_AND_SET(spin_count);
             VALIDATE_AND_SET(thread_priority);
             VALIDATE_AND_SET(ht);
@@ -422,6 +432,26 @@ private:
             }
         }
 
+        if (umwait_power_state_used)
+        {
+            if ((join_type < 7) || (join_type > 10))
+            {
+                printf("Warning: '--umwait_power_state' is specified, but value will not be used for non-'umwait' wait type.\n");
+            }
+            else
+            {
+                UMWAIT_LOW_POWER = umwait_power_state == 0;
+            }
+        }
+        else
+        {
+            if ((join_type >= 7) && (join_type <= 10))
+            {
+                printf("Warning: '--umwait_power_state' is needed when join_type is related to umwait.\n");
+                PrintUsageAndExit();
+            }
+        }
+
         if (spin_count_used)
         {
             SPIN_COUNT = spin_count;
@@ -489,10 +519,14 @@ private:
         printf("  4= Use 'mwaitx', only use in spin-loop, no hard-wait [t_join_mwaitx_loop_soft_wait_only]\n");
         printf("  5= Use 'mwaitx', no spin-loop involved [t_join_mwaitx_noloop]\n");
         printf("  6= Use 'mwaitx', no spin-loop involved, no hard-wait [t_join_mwaitx_noloop_soft_wait_only]\n");
-        printf("  7= Only hard-wait. [t_join_hard_wait_only]\n");
-        printf("  8= Same as the current impl but with no pause. [t_join_no_pause]\n");
-        printf("  9= Same as the current impl but with 2 pause instructions per iteration. [t_join_pause2]\n");
-        printf(" 10= Same as the current impl but with 10 pause instructions per iteration. [t_join_pause10]\n");
+        printf("  7= Use 'umwait', use inside spin-loop [t_join_umwait_loop]\n");
+        printf("  8= Use 'umwait', only use in spin-loop, no hard-wait [t_join_umwait_loop_soft_wait_only]\n");
+        printf("  9= Use 'umwait', no spin-loop involved [t_join_umwait_noloop]\n");
+        printf("  10= Use 'umwait', no spin-loop involved, no hard-wait [t_join_umwait_noloop_soft_wait_only]\n");
+        printf("  11= Only hard-wait. [t_join_hard_wait_only]\n");
+        printf("  12= Same as the current impl but with no pause. [t_join_no_pause]\n");
+        printf("  13= Same as the current impl but with 2 pause instructions per iteration. [t_join_pause2]\n");
+        printf(" 14= Same as the current impl but with 10 pause instructions per iteration. [t_join_pause10]\n");
         exit(1);
     }
 
@@ -550,15 +584,27 @@ public:
             joinData = new t_join_mwaitx_noloop_soft_wait_only(PROCESSOR_COUNT, MWAITX_CYCLES);
             break;
         case 7:
-            joinData = new t_join_hard_wait_only(PROCESSOR_COUNT);
+            joinData = new t_join_umwait_loop(PROCESSOR_COUNT, MWAITX_CYCLES, UMWAIT_LOW_POWER);
             break;
         case 8:
-            joinData = new t_join_no_pause(PROCESSOR_COUNT);
+            joinData = new t_join_umwait_loop_soft_wait_only(PROCESSOR_COUNT, MWAITX_CYCLES, UMWAIT_LOW_POWER);
             break;
         case 9:
-            joinData = new t_join_pause2(PROCESSOR_COUNT);
+            joinData = new t_join_umwait_noloop(PROCESSOR_COUNT, MWAITX_CYCLES, UMWAIT_LOW_POWER);
             break;
         case 10:
+            joinData = new t_join_umwait_noloop_soft_wait_only(PROCESSOR_COUNT, MWAITX_CYCLES, UMWAIT_LOW_POWER);
+            break;
+        case 11:
+            joinData = new t_join_hard_wait_only(PROCESSOR_COUNT);
+            break;
+        case 12:
+            joinData = new t_join_no_pause(PROCESSOR_COUNT);
+            break;
+        case 13:
+            joinData = new t_join_pause2(PROCESSOR_COUNT);
+            break;
+        case 14:
             joinData = new t_join_pause10(PROCESSOR_COUNT);
             break;
         default:

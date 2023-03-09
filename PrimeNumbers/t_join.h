@@ -421,3 +421,93 @@ public:
     /// <returns>Total spin iterations performed.</returns>
     virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
 };
+
+//------
+
+class t_join_umwait_noloop : public t_join
+{
+private:
+    const int umwait_cycles;
+    const bool is_low_power;
+
+public:
+    t_join_umwait_noloop(int numThreads, int umwait_timeout, bool low_power) : t_join(numThreads), umwait_cycles(umwait_timeout), is_low_power(low_power)
+    {
+    }
+
+    /// <summary>
+    /// Use umonitor/umwait without doing spin-loop. If the timeout
+    /// expires and the color hasn't change, it will go to hard-wait.
+    /// </summary>
+    /// <param name="inputIndex">index for which join is performed.</param>
+    /// <param name="threadId">Thread id</param>
+    /// <param name="wasHardWait">If there was hardwait needed</param>
+    /// <returns>Total spin iterations performed.</returns>
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
+};
+
+class t_join_umwait_loop : public t_join
+{
+private:
+    const int umwait_cycles;
+    const bool is_low_power;
+
+public:
+    t_join_umwait_loop(int numThreads, int umwait_timeout, bool low_power) : t_join(numThreads), umwait_cycles(umwait_timeout), is_low_power(low_power)
+    {
+    }
+
+    /// <summary>
+    /// Use umonitor/umwait inside spin-loop. If the timeout
+    /// expires and the color hasn't change, it will go to hard-wait.
+    /// </summary>
+    /// <param name="inputIndex">index for which join is performed.</param>
+    /// <param name="threadId">Thread id</param>
+    /// <param name="wasHardWait">If there was hardwait needed</param>
+    /// <returns>Total spin iterations performed.</returns>
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
+};
+
+class t_join_umwait_loop_soft_wait_only : public t_join
+{
+private:
+    const int umwait_cycles;
+    const bool is_low_power;
+
+public:
+    t_join_umwait_loop_soft_wait_only(int numThreads, int umwait_timeout, bool low_power) : t_join(numThreads), umwait_cycles(umwait_timeout), is_low_power(low_power)
+    {
+    }
+
+    /// <summary>
+    /// Only uses spin-loop for color change, with "umwait" inside every iteration.
+    /// No hard-wait is done.
+    /// </summary>
+    /// <param name="inputIndex">index for which join is performed.</param>
+    /// <param name="threadId">Thread id</param>
+    /// <param name="wasHardWait">If there was hardwait needed</param>
+    /// <returns>Total spin iterations performed.</returns>
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
+};
+
+class t_join_umwait_noloop_soft_wait_only : public t_join
+{
+private:
+    const int umwait_cycles;
+    const bool is_low_power;
+
+public:
+    t_join_umwait_noloop_soft_wait_only(int numThreads, int umwait_timeout, bool low_power) : t_join(numThreads), umwait_cycles(umwait_timeout), is_low_power(low_power)
+    {
+    }
+
+    /// <summary>
+    /// Only uses "umwait" with TIMEOUT inside every iteration.
+    /// No hard-wait is done.
+    /// </summary>
+    /// <param name="inputIndex">index for which join is performed.</param>
+    /// <param name="threadId">Thread id</param>
+    /// <param name="wasHardWait">If there was hardwait needed</param>
+    /// <returns>Total spin iterations performed.</returns>
+    virtual ulong join(int inputIndex, int threadId, bool* wasHardWait, unsigned __int64* spinLoopStartTime, unsigned __int64* spinLoopStopTime);
+};

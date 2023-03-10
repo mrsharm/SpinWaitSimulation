@@ -57,12 +57,12 @@ totalSoftWaits | The total number of softwaits.
 Soft Wait : Total| Total number of softwaits.
 Soft Wait: #/input| Total number of softwaits / (Input_Count * (Thread_count - 1))
 Soft Wait: Iterations/wait| Average Iterations Per Soft Wait.
-Soft Wait: Spin time / wait| Average Spin Loop Time Per Soft Wait.
+Soft Wait: Spin CPU Time | Average Spin Loop Time Per Soft Wait.
 Soft Wait: wakeup latency / wait| Average Softwait Wake up Time 
 Hard Wait : Total| Total number of softwaits.
 Hard Wait: #/input| Total number of softwaits / (Input_Count * (Thread_count - 1))
 Hard Wait: Iterations/wait| Average Iterations Per Hard Wait.
-Hard Wait: Spin time / wait| Average Spin Loop Time Per Hard Wait.
+Hard Wait: Spin CPU Time | Average Spin Loop Time Per Hard Wait.
 Hard Wait: wakeup latency / wait| Average Hardwait Wake up Time 
 Total cycles spinning | Total Spin Loop Time 
 Cycles spin per thread| Total Spin Loop Time / Thread_Count
@@ -78,7 +78,7 @@ Note:
 
 ### Sample output
 
-|HT|Affinity|Input_count|Complexity|join_type|Spin_count|Thread_count|Soft Wait : Total|Soft Wait: #/input|Soft Wait: Iterations/wait|Soft Wait: Spin time / wait|Soft Wait: wakeup latency / wait|Hard Wait : Total|Hard Wait: #/input|Hard Wait: Iterations/wait|Hard Wait: Spin time / wait|Hard Wait: wakeup latency / wait|Total cycles spinning |Cycles spin per thread|Elapsed time|Elapsed cycles|MWaitx Cycles
+|HT|Affinity|Input_count|Complexity|join_type|Spin_count|Thread_count|Soft Wait : Total|Soft Wait: #/input|Soft Wait: Iterations/wait|Soft Wait: Spin CPU Time|Soft Wait: wakeup latency / wait|Hard Wait : Total|Hard Wait: #/input|Hard Wait: Iterations/wait|Hard Wait: Spin CPU Time|Hard Wait: wakeup latency / wait|Total cycles spinning |Cycles spin per thread|Elapsed time|Elapsed cycles|MWaitx Cycles
 |--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|--|
 |no HT|affinity|1000|0||128000|2|1000|1|583.2|20884.2|248|0|0|0|0|0|20883836.8|10441918.4|26|0
 |no HT|affinity|1000|0||128000|2|14|0.014799999999999999|2|2681.4|1106.6|985|0.9852000000000001|2|2192.4|20008.6|2198054.4|1099027.2|37|0

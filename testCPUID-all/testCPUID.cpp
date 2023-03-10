@@ -371,13 +371,48 @@ void parse_cmd_args(int argc, char** argv)
 void SetThreadAffinity(HANDLE tHandle, int procNum)
 {
     GROUP_AFFINITY ga;
-    //ga.Group = (WORD)groupProcNo.GetGroup();
     ga.Group = (WORD)(procNum >> 6);
     ga.Reserved[0] = 0; // reserve must be filled with zero
     ga.Reserved[1] = 0; // otherwise call may fail
     ga.Reserved[2] = 0;
-    //ga.Mask = (size_t)1 << groupProcNo.GetProcIndex();
     ga.Mask = (size_t)1 << (procNum % 64);
+
+    /*
+procNum         uprof
+-----------------------
+0-7             0-7      Group 0
+8-15            16-23
+16-23           32-39
+24-31           48-55
+32-39           64-71
+40-47           80-87
+48-55           96-103
+56-63           112-119
+
+64-71           8-15    Group 1
+72-79           24-31
+80-87           40-47
+88-95           56-63
+96-103          72-79
+104-111         88-95
+112-119         104-111
+120-127         120-127
+    */
+
+    //for (procNum = 0; procNum < 128; procNum++)
+    {
+        int n = procNum / 8;
+        int m = procNum % 8;
+        int answer = 0;
+        if (procNum >= 64)
+        {
+            n -= 8;
+            answer = 8;
+        }
+        answer += (2 * n * 8) + m;
+        printf("ProcNum: %d maps to uProf core: %d\n", procNum, answer);
+    }
+
     BOOL result = SetThreadGroupAffinity(tHandle, &ga, nullptr);
     if (result == 0)
     {
@@ -411,18 +446,20 @@ void experiment(LPTHREAD_START_ROUTINE proc)
 
     if (g_worker_core >= 0)
     {
+        printf("Worker core: ");
         SetThreadAffinity(g_hThread, g_worker_core);
     }
 
     if (g_mainthread_core >= 0)
     {
+        printf("Main core: ");
         SetThreadAffinity(GetCurrentThread(), g_mainthread_core);
     }
 
     ResumeThread(g_hThread);
 
     // sleep for 10s
-    Sleep((DWORD)10 * 1000);
+    Sleep((DWORD)20 * 1000);
     g_aligned_global_location.loc = 5;
 
     printf("end...\n");

@@ -416,7 +416,7 @@ private:
         {
             if ((join_type < 3) || (join_type > 10))
             {
-                printf("Warning: '--mwaitx_cycle_count' is specified, but value will not be used for 'pause' wait type.\n");
+                printf("Warning: '--wait_count' is specified, but value will not be used for 'pause' wait type.\n");
             }
             else
             {
@@ -427,7 +427,7 @@ private:
         {
             if ((join_type >= 3) && (join_type <= 10))
             {
-                printf("Warning: '--mwaitx_cycle_count' is needed when join_type is related to mwaitx/umwait.\n");
+                printf("Warning: '--wait_count' is needed when join_type is related to mwaitx/umwait.\n");
                 PrintUsageAndExit();
             }
         }
@@ -508,6 +508,7 @@ private:
         printf("--thread_priority [0|1]: If 1 (default), create threads with high priority otherwise create them with normal priority.\n\n");
         printf("--spin_count <N>: If specified, the number of iterations to spin before going to hardwait. Default= 128000.\n\n");
         printf("--wait_count <N>: WAIT value to be used in mwaitx()/umwait(). Required if --join_type is between [3-10]. For mwaitx, it is cycles and for umwait, it is timestamp.\n\n");
+        printf("--umwait_power_state [0|1]: If 0, execute umwait in high power savings/slower wake-up; if 1, low power savings/fast wake-up.\n");
         printf("--affi <AFF_TYPE>: Affinitization to conduct. <AFF_TYPE> can be:\n");
         printf("  0= affinity (default)\n");
         printf("  1= affinity physical core\n");

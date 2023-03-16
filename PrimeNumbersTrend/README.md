@@ -68,7 +68,7 @@ Total cycles spinning | Total Spin Loop Time
 Cycles spin per thread| Total Spin Loop Time / Thread_Count
 Elapsed time| Total time in microseconds taken to process entire input.
 Elapsed cycles| Elapsed Ticks
-MWaitx Cycles | MWaitx Cycles
+Timeout | Either MwaitX CPU cycles or UMWAIT timestamp at which these instructions timeout.
 
 Note:
 - `*_per_number` shows metrics to process each number.

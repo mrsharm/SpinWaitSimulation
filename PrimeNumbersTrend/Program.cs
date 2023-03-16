@@ -108,7 +108,7 @@ public class PrimeNumbersTrend
         public int Ht { get; }
 
         public string CommandLine
-            => $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --mwaitx_cycle_count {Timeout} --affi {Affinitize} --join_type {JoinType} --ht {Ht}";
+            => $"--input_count {Input} --complexity {Complexity} --thread_count {Thread} --wait_count {Timeout} --affi {Affinitize} --join_type {JoinType} --ht {Ht}";
     }
 
 
@@ -160,7 +160,7 @@ public class PrimeNumbersTrend
                 results.Append("|Cycles spin per thread");
                 results.Append("|Elapsed time");
                 results.Append("|Elapsed cycles");
-                results.Append("|MWaitx Cycles");
+                results.Append("|Timeout");
                 results.AppendLine();
                 int columns = results.ToString().Count(c => c == '|');
                 for (int col = 0; col <= columns; col++) 

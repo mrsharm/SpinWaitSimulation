@@ -371,13 +371,115 @@ void parse_cmd_args(int argc, char** argv)
 void SetThreadAffinity(HANDLE tHandle, int procNum)
 {
     GROUP_AFFINITY ga;
-    //ga.Group = (WORD)groupProcNo.GetGroup();
     ga.Group = (WORD)(procNum >> 6);
     ga.Reserved[0] = 0; // reserve must be filled with zero
     ga.Reserved[1] = 0; // otherwise call may fail
     ga.Reserved[2] = 0;
-    //ga.Mask = (size_t)1 << groupProcNo.GetProcIndex();
     ga.Mask = (size_t)1 << (procNum % 64);
+
+/**********************************************************************************
+* For high core machines (like the one we are experimenting with), the hierarchy
+* looks like below:
+* /----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\
+* | Machine (242GB total)                                                                                                                                                                                                |
+* |                                                                                                                                                                                                                      |
+* | /------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\ |
+* | | Group #0                                                                                                                                                                                                         | |
+* | |                                                                                                                                                                                                                  | |
+* | | /--------------------------------------------------------------\  /--------------------------------------------------------------\              /--------------------------------------------------------------\ | |
+* | | | NUMANode P#0 (13GB)                                          |  | NUMANode P#2 (15GB)                                          |  ++  ++  ++  | NUMANode P#16(14GB)                                          | | |
+* | | \--------------------------------------------------------------/  \--------------------------------------------------------------/              \--------------------------------------------------------------/ | |
+* | |                                                                                                                                      8x total                                                                    | |
+* | |                                                                                                                                                                                                                  | |
+* | |                                                                                                                                                                                                                  | |
+* | | /--------------\  /--------------\              /--------------\  /--------------\  /--------------\              /--------------\              /--------------\  /--------------\              /--------------\ | |
+* | | | Core         |  | Core         |  ++  ++  ++  | Core         |  | Core         |  | Core         |  ++  ++  ++  | Core         |              | Core         |  | Core         |  ++  ++  ++  | Core         | | |
+* | | |              |  |              |              |              |  |              |  |              |              |              |              |              |  |              |              |              | | |
+* | | | /----------\ |  | /----------\ |   8x total   | /----------\ |  | /----------\ |  | /----------\ |   8x total   | /----------\ |              | /----------\ |  | /----------\ |   8x total   | /----------\ | | |
+* | | | |  PU P#0  | |  | |  PU P#1  | |              | |  PU P#7  | |  | |  PU P#8  | |  | |  PU P#9  | |              | | PU P#15  | |              | | PU P#88  | |  | | PU P#89  | |              | | PU P#95  | | | |
+* | | | \----------/ |  | \----------/ |              | \----------/ |  | \----------/ |  | \----------/ |              | \----------/ |              | \----------/ |  | \----------/ |              | \----------/ | | |
+* | | \--------------/  \--------------/              \--------------/  \--------------/  \--------------/              \--------------/              \--------------/  \--------------/              \--------------/ | |
+* | \------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------/ |
+* |                                                                                                                                                                                                                      |
+* | /------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\ |
+* | | Group #1                                                                                                                                                                                                    | |
+* | |                                                                                                                                                                                                                  | |
+* | |        ...............
+* | \------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------/ |
+* \----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------/
+*
+* A machine has packages (usually 2, but may be higher) and they are sometimes referred
+* to as groups. Each group has various NUMA nodes. The presence of NUMA nodes are not
+* necessarily sequential. In above example, all the even numbered NUMA nodes are present
+* in group #0 and odd-numbered are present in group #1. To find which NUMA nodes are present
+* in which group, follow the instructions:
+* Task Manager -> Detail -> right-click on any non-admin process -> Set affinity
+* If the machine is multi-package or multi-group NUMA aware machine, you would see a drop-down
+* to select group and the corresponding NUMA nodes will show up. Each NUMA node contains the 
+* cores (typically 8 cores).
+*           Group 0
+*               NUMA 0      0 ~ 7
+*               NUMA 2      16 ~ 23
+*               NUMA 4      32 ~ 39
+*               .....
+*           Group 1
+*               NUMA 1      8 ~ 16
+*               NUMA 3      24 ~ 31
+*               .....
+*
+* With that background, lets see how below table was calculated. For simplicity, we have turned
+* off hyper-threading OFF.
+*
+* When affinitizing procNum 0~7, they would map 1-to-1 with core 0~7. Next, procNum 8~16 is mapped
+* to the cores in Group 0, as per (procNum >> 6) calculation above. But those maps to core 16~23
+* as seen in example above. Likewise, when procNum 64~71 is passed, those are the first set of 
+* cores we are trying to affinitize in Group# 1 and hence maps to core 8~16.
+*
+* On the contrary, below calculation could have been reverse mapped, i.e. we could have treated the
+* procNum as the one we want to see on uprof and recalculated the numbers to be set in GROUP_AFFINITY
+* struct.
+*
+* To conclude, these numbers are HARDCODED for a particular machine and uprof uses numa nodes to do
+* its core indexing so in this case group#0 contains numa node 0, 2, 4, etc, instead of node 0, 1, 2, etc.
+* And each numa node has 8 cores in this case. so in cpu group terms, core#8 in group#0 actually is
+* considered as core#16 by uprof, because it belongs to numa node#2.
+* -----------------------
+* procNum         uprof
+* -----------------------
+* 0-7             0-7      Group 0
+* 8-15            16-23
+* 16-23           32-39
+* 24-31           48-55
+* 32-39           64-71
+* 40-47           80-87
+* 48-55           96-103
+* 56-63           112-119
+
+* 64-71           8-15    Group 1
+* 72-79           24-31
+* 80-87           40-47
+* 88-95           56-63
+* 96-103          72-79
+* 104-111         88-95
+* 112-119         104-111
+* 120-127         120-127
+*
+**********************************************************************************/
+
+    //for (procNum = 0; procNum < 128; procNum++)
+    {
+        int n = procNum / 8;
+        int m = procNum % 8;
+        int answer = 0;
+        if (procNum >= 64)
+        {
+            n -= 8;
+            answer = 8;
+        }
+        answer += (2 * n * 8) + m;
+        printf("ProcNum: %d maps to uProf core: %d\n", procNum, answer);
+    }
+
     BOOL result = SetThreadGroupAffinity(tHandle, &ga, nullptr);
     if (result == 0)
     {
@@ -411,11 +513,13 @@ void experiment(LPTHREAD_START_ROUTINE proc)
 
     if (g_worker_core >= 0)
     {
+        printf("Worker core: ");
         SetThreadAffinity(g_hThread, g_worker_core);
     }
 
     if (g_mainthread_core >= 0)
     {
+        printf("Main core: ");
         SetThreadAffinity(GetCurrentThread(), g_mainthread_core);
     }
 

@@ -438,6 +438,11 @@ void SetThreadAffinity(HANDLE tHandle, int procNum)
 * On the contrary, below calculation could have been reverse mapped, i.e. we could have treated the
 * procNum as the one we want to see on uprof and recalculated the numbers to be set in GROUP_AFFINITY
 * struct.
+*
+* To conclude, these numbers are HARDCODED for a particular machine and uprof uses numa nodes to do
+* its core indexing so in this case group#0 contains numa node 0, 2, 4, etc, instead of node 0, 1, 2, etc.
+* And each numa node has 8 cores in this case. so in cpu group terms, core#8 in group#0 actually is
+* considered as core#16 by uprof, because it belongs to numa node#2.
 * -----------------------
 * procNum         uprof
 * -----------------------

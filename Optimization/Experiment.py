@@ -46,7 +46,7 @@ class OptimizationExperiment(object):
                 pbounds=INPUT_RANGE,
                 random_state=SEED,)
 
-            file_name = f"{OUTPUT_BASE_FOLDER}/{f.__name__}._incomplete"
+            file_name = f"{OUTPUT_BASE_FOLDER}/{f.__name__}._incomplete.json"
 
             logger = JSONLogger(path = file_name)
             optimizer.subscribe(Events.OPTIMIZATION_STEP, logger)

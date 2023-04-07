@@ -18,7 +18,7 @@ EXPLORATION_EXPLOITATION_PARAMETER = 0.1
 # For reproducibility.
 SEED = 1
 
-TOTAL_ITERATIONS = 10 
+TOTAL_ITERATIONS = 200 
 
 # Inner iterations to find some central value.
 INNER_ITERATIONS = 5
@@ -91,7 +91,7 @@ def pivot_thread_count(spin_count, thread_count):
         vals.append(v)
     median = statistics.median(vals)
     print(f"Input: {spin_count} | Output: {median}")
-    return median 
+    return median
 
 def pivot_thread_count_2(spin_count):
     return pivot_thread_count(spin_count, 2)
